@@ -8,20 +8,27 @@ type ApiKeyRecord = {
   id: string;
   name: string;
   key_prefix: string;
-  environment: "test";
+  environment: "test" | "live";
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
 };
 
+type LiveStatus = { enabled: boolean; verified: boolean };
+type Environment = "test" | "live";
+
 export default function ApiKeyManager() {
   const [keys, setKeys] = useState<ApiKeyRecord[]>([]);
+  const [live, setLive] = useState<LiveStatus>({ enabled: false, verified: false });
   const [keyName, setKeyName] = useState("Mon intégration");
+  const [liveName, setLiveName] = useState("Production");
   const [newKey, setNewKey] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const canCreateLive = live.enabled && live.verified;
 
   async function refreshKeys() {
     setLoading(true);
@@ -30,9 +37,10 @@ export default function ApiKeyManager() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Impossible de charger les clés.");
       setKeys(result.keys);
+      setLive(result.live ?? { enabled: false, verified: false });
       setMessage("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "La migration des clés de test doit être appliquée.");
+      setMessage(error instanceof Error ? error.message : "Impossible de charger les clés.");
     } finally {
       setLoading(false);
     }
@@ -40,7 +48,7 @@ export default function ApiKeyManager() {
 
   useEffect(() => { void refreshKeys(); }, []);
 
-  async function createKey(event: FormEvent<HTMLFormElement>) {
+  async function createKey(event: FormEvent<HTMLFormElement>, environment: Environment, name: string) {
     event.preventDefault();
     setBusy(true);
     setMessage("");
@@ -49,21 +57,21 @@ export default function ApiKeyManager() {
       const response = await fetch("/api/developer-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: keyName }),
+        body: JSON.stringify({ name, environment }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Impossible de créer la clé.");
       setNewKey(result.key);
       await refreshKeys();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Impossible de créer la clé de test.");
+      setMessage(error instanceof Error ? error.message : "Impossible de créer la clé.");
     } finally {
       setBusy(false);
     }
   }
 
   async function revokeKey(id: string) {
-    if (!window.confirm("Révoquer cette clé ? Les appels qui l’utilisent cesseront de fonctionner.")) return;
+    if (!window.confirm("Révoquer cette clé ? Les appels qui l’utilisent cesseront de fonctionner immédiatement.")) return;
     setBusy(true);
     setMessage("");
     try {
@@ -71,7 +79,7 @@ export default function ApiKeyManager() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Impossible de révoquer cette clé.");
       setKeys((current) => current.map((item) => item.id === id ? { ...item, revoked_at: new Date().toISOString() } : item));
-      if (newKey && keys.find((item) => item.id === id)?.key_prefix === newKey.slice(0, 15)) setNewKey("");
+      setNewKey("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Impossible de révoquer cette clé.");
     } finally {
@@ -85,17 +93,32 @@ export default function ApiKeyManager() {
     window.setTimeout(() => setCopied(false), 1800);
   }
 
+  const lockReason = !live.enabled
+    ? "Les clés live ne sont pas encore activées sur FlashPay."
+    : "Ton compte doit être vérifié par FlashPay avant de créer une clé live.";
+
   return <section className="workspace-view">
-    <div className="view-intro"><span className="view-icon"><KeyRound size={19} /></span><div><h2>Accès développeur</h2><p>Crée des clés de test et connecte ton application à la documentation FlashPay.</p></div></div>
-    <div className="demo-banner"><span className="demo-pulse" /><strong>Environnement de test</strong><span>Les clés fp_test_ ne peuvent jamais déclencher un paiement réel.</span></div>
+    <div className="view-intro"><span className="view-icon"><KeyRound size={19} /></span><div><h2>Accès développeur</h2><p>Crée des clés pour connecter ton application à FlashPay.</p></div></div>
     {message && <div className="notice-bar" role="status"><ShieldCheck size={16} /><span>{message}</span><button aria-label="Fermer" onClick={() => setMessage("")}>×</button></div>}
     {newKey && <div className="new-key-reveal"><div><strong>Copie cette clé maintenant</strong><span>Elle ne sera plus affichée après avoir quitté cet écran.</span></div><code>{newKey}</code><button className="export-button" onClick={() => void copyKey()}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? "Copiée" : "Copier"}</button></div>}
-    <article className="panel key-panel"><div className="panel-heading"><div><h2>Créer une clé de test</h2><p>Une clé test permet uniquement d’essayer l’API de démonstration.</p></div><span className="test-key-badge">TEST</span></div>
-      <form className="key-create-form" onSubmit={createKey}><label htmlFor="api-key-name">Nom de l’intégration</label><div><input id="api-key-name" maxLength={60} onChange={(event) => setKeyName(event.target.value)} required value={keyName} /><button className="primary-button" disabled={busy} type="submit"><Plus size={16} />{busy ? "Création…" : "Créer une clé test"}</button></div></form>
-      <div className="key-list-head"><strong>Clés de test</strong><button className="text-action" onClick={() => void refreshKeys()} type="button">Actualiser</button></div>
-      {loading ? <p className="empty-keys">Chargement des clés…</p> : keys.length === 0 ? <p className="empty-keys">Aucune clé test pour le moment.</p> : <div className="key-list">{keys.map((item) => <div className="key-row" key={item.id}><span className="key-row-icon"><KeyRound size={16} /></span><div className="key-row-copy"><strong>{item.name}</strong><code>{item.key_prefix}••••••••••••</code></div><span className={item.revoked_at ? "key-status key-revoked" : "key-status"}>{item.revoked_at ? "Révoquée" : "Active · test"}</span>{!item.revoked_at && <button aria-label={`Révoquer ${item.name}`} className="key-revoke" disabled={busy} onClick={() => void revokeKey(item.id)}><Trash2 size={16} /></button>}</div>)}</div>}
+
+    <article className="panel key-panel"><div className="panel-heading"><div><h2>Créer une clé de test</h2><p>Une clé test permet uniquement d’essayer l’API. Aucun paiement réel n’est déclenché.</p></div><span className="test-key-badge">TEST</span></div>
+      <form className="key-create-form" onSubmit={(event) => void createKey(event, "test", keyName)}><label htmlFor="api-key-name">Nom de l’intégration</label><div><input id="api-key-name" maxLength={60} onChange={(event) => setKeyName(event.target.value)} required value={keyName} /><button className="primary-button" disabled={busy} type="submit"><Plus size={16} />{busy ? "Création…" : "Créer une clé test"}</button></div></form>
     </article>
-    <article className="production-key-lock"><div className="production-lock-icon"><ShieldCheck size={20} /></div><div><span className="production-lock-label">CLÉS DE PRODUCTION</span><h3>Disponibles après validation</h3><p>Les clés de production resteront verrouillées tant que FlashPay n’aura pas de vérification KYC sécurisée, de sous-comptes Swychr et d’accord écrit pour encaisser au nom de tiers.</p></div><span className="locked-pill">Verrouillé</span></article>
-    <p className="security-note"><ShieldCheck size={15} /> FlashPay ne conserve jamais une clé en clair. Une clé test est montrée une seule fois puis stockée sous forme hachée.</p>
+
+    {canCreateLive ? (
+      <article className="panel key-panel"><div className="panel-heading"><div><h2>Créer une clé live</h2><p>Une clé live encaisse de vrais paiements. Garde-la secrète et ne la mets jamais dans du code côté navigateur.</p></div><span className="locked-pill">LIVE</span></div>
+        <form className="key-create-form" onSubmit={(event) => void createKey(event, "live", liveName)}><label htmlFor="live-key-name">Nom de l’intégration</label><div><input id="live-key-name" maxLength={60} onChange={(event) => setLiveName(event.target.value)} required value={liveName} /><button className="primary-button" disabled={busy} type="submit"><Plus size={16} />{busy ? "Création…" : "Créer une clé live"}</button></div></form>
+      </article>
+    ) : (
+      <article className="production-key-lock"><div className="production-lock-icon"><ShieldCheck size={20} /></div><div><span className="production-lock-label">CLÉS LIVE</span><h3>Pas encore disponibles</h3><p>{lockReason}</p></div><span className="locked-pill">Verrouillé</span></article>
+    )}
+
+    <article className="panel key-panel">
+      <div className="key-list-head"><strong>Mes clés</strong><button className="text-action" onClick={() => void refreshKeys()} type="button">Actualiser</button></div>
+      {loading ? <p className="empty-keys">Chargement des clés…</p> : keys.length === 0 ? <p className="empty-keys">Aucune clé pour le moment.</p> : <div className="key-list">{keys.map((item) => <div className="key-row" key={item.id}><span className="key-row-icon"><KeyRound size={16} /></span><div className="key-row-copy"><strong>{item.name}</strong><code>{item.key_prefix}••••••••••••</code></div><span className={item.revoked_at ? "key-status key-revoked" : "key-status"}>{item.revoked_at ? "Révoquée" : `Active · ${item.environment}`}</span>{!item.revoked_at && <button aria-label={`Révoquer ${item.name}`} className="key-revoke" disabled={busy} onClick={() => void revokeKey(item.id)}><Trash2 size={16} /></button>}</div>)}</div>}
+    </article>
+
+    <p className="security-note"><ShieldCheck size={15} /> FlashPay ne conserve jamais une clé en clair. Chaque clé est montrée une seule fois puis stockée sous forme hachée.</p>
   </section>;
 }
