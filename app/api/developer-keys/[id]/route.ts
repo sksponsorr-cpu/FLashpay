@@ -12,7 +12,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ message: "Connecte-toi pour révoquer une clé." }, { status: 401 });
 
-    const { data, error } = await supabase.rpc("revoke_test_api_key", { p_key_id: id });
+    const { data, error } = await supabase.rpc("revoke_api_key", { p_key_id: id });
     if (error) return NextResponse.json({ message: "Impossible de révoquer cette clé." }, { status: 503 });
     if (!data) return NextResponse.json({ message: "Cette clé est introuvable ou déjà révoquée." }, { status: 404 });
 
