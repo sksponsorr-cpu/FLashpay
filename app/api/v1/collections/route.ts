@@ -5,6 +5,11 @@ import { getSupportedCountry } from "@/lib/countries";
 
 export async function POST(request: Request) {
   const key = request.headers.get("x-flashpay-key");
+  if (key?.startsWith("fp_live_")) {
+    // Les clés live ne déclenchent aucune collecte réelle tant que l'enregistrement des transactions
+    // et l'appel Swychr de collecte ne sont pas implémentés.
+    return NextResponse.json({ message: "Les collectes live ne sont pas encore disponibles." }, { status: 503 });
+  }
   if (!key?.startsWith("fp_test_")) {
     return NextResponse.json({ message: "Une clé de test FlashPay valide est requise dans X-FlashPay-Key." }, { status: 401 });
   }
