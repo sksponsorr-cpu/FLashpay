@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupportedCountry } from "@/lib/countries";
+import { createClient } from "@/lib/supabase/server";
 
 type CollectionInput = {
   country_code?: string;
@@ -13,6 +14,17 @@ type CollectionInput = {
 };
 
 export async function POST(request: Request) {
+  // Seuls les utilisateurs connectés peuvent déclencher une demande de collecte.
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ message: "Connecte-toi pour créer une collecte." }, { status: 401 });
+    }
+  } catch {
+    return NextResponse.json({ message: "Supabase n’est pas disponible." }, { status: 503 });
+  }
+
   let input: CollectionInput;
 
   try {
@@ -37,7 +49,7 @@ export async function POST(request: Request) {
 
   if (process.env.SWYCHR_LIVE_PAYMENTS_ENABLED === "true") {
     return NextResponse.json(
-      { message: "Les paiements réels restent bloqués jusqu’à la mise en place de l’authentification, du stockage durable et des validations Swychr." },
+      { message: "Les paiements réels restent bloqués jusqu’à la mise en place de l’enregistrement durable et des validations Swychr." },
       { status: 503 },
     );
   }
