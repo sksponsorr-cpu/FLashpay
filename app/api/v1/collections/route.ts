@@ -6,8 +6,7 @@ import { getSupportedCountry } from "@/lib/countries";
 export async function POST(request: Request) {
   const key = request.headers.get("x-flashpay-key");
   if (key?.startsWith("fp_live_")) {
-    // Les clés live ne déclenchent aucune collecte réelle tant que l'enregistrement des transactions
-    // et l'appel Swychr de collecte ne sont pas implémentés.
+    // Les clés live ne déclenchent aucune collecte réelle tant que l'appel Swychr de collecte n'est pas implémenté.
     return NextResponse.json({ message: "Les collectes live ne sont pas encore disponibles." }, { status: 503 });
   }
   if (!key?.startsWith("fp_test_")) {
@@ -24,15 +23,6 @@ export async function POST(request: Request) {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
   const keyHash = createHash("sha256").update(key).digest("hex");
-  const { data: keyRows, error: keyError } = await supabase.rpc("validate_test_api_key", { p_key_hash: keyHash });
-  const keyRecord = Array.isArray(keyRows) ? keyRows[0] : keyRows;
-
-  if (keyError) {
-    return NextResponse.json({ message: "Le service de clés de test n’est pas initialisé. Applique la migration API keys." }, { status: 503 });
-  }
-  if (!keyRecord) {
-    return NextResponse.json({ message: "Cette clé est invalide ou révoquée." }, { status: 401 });
-  }
 
   let body: { country_code?: string; amount?: number; mobile?: string; name?: string; transaction_id?: string; payment_method?: string };
   try {
@@ -51,16 +41,45 @@ export async function POST(request: Request) {
   }
 
   const transactionId = body.transaction_id?.trim() || `FPTEST-${randomBytes(8).toString("hex").toUpperCase()}`;
+
+  const { data, error } = await supabase.rpc("record_api_transaction", {
+    p_key_hash: keyHash,
+    p_transaction_id: transactionId,
+    p_country_code: country.code,
+    p_currency_code: country.currency,
+    p_payment_method: body.payment_method ?? null,
+    p_amount: amount,
+    p_environment: "test",
+  });
+
+  if (error) {
+    const text = error.message ?? "";
+    if (text.includes("INVALID_KEY")) {
+      return NextResponse.json({ message: "Cette clé est invalide ou révoquée." }, { status: 401 });
+    }
+    if (text.includes("UNKNOWN_CURRENCY")) {
+      return NextResponse.json({ message: "Aucune commission n’est configurée pour cette devise." }, { status: 503 });
+    }
+    return NextResponse.json({ message: "La transaction n’a pas pu être enregistrée. Vérifie que les migrations sont appliquées." }, { status: 503 });
+  }
+
+  const record = Array.isArray(data) ? data[0] : data;
+  if (!record) {
+    return NextResponse.json({ message: "Cet identifiant de transaction est déjà utilisé." }, { status: 409 });
+  }
+
   return NextResponse.json({
     mode: "test",
     data: {
-      transaction_id: transactionId,
+      transaction_id: record.out_transaction_id,
       country_code: country.code,
       currency_code: country.currency,
       amount,
       payment_method: body.payment_method ?? null,
-      status: "pending",
-      message: "Collecte simulée. Aucun appel à Swychr et aucun mouvement de fonds n’ont eu lieu.",
+      status: record.out_status,
+      platform_fee: record.out_platform_fee,
+      net_payable: record.out_net_payable,
+      message: "Collecte de test enregistrée. Aucun appel à Swychr et aucun mouvement de fonds n’ont eu lieu.",
     },
   });
 }
