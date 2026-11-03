@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 import { getSupportedCountry } from "@/lib/countries";
+import { createClient } from "@/lib/supabase/server";
 
 const endpoint = "https://api.accountpe.com/api/payout/payout_methods";
 
 export async function GET(request: Request) {
+  // Seuls les utilisateurs connectés peuvent interroger le compte marchand.
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ message: "Connecte-toi pour voir les moyens de paiement." }, { status: 401 });
+    }
+  } catch {
+    return NextResponse.json({ message: "Supabase n’est pas disponible." }, { status: 503 });
+  }
+
   const countryCode = new URL(request.url).searchParams.get("country_code")?.trim().toUpperCase();
 
   const country = getSupportedCountry(countryCode);
