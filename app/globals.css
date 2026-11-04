@@ -291,3 +291,94 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
   .primary-button { min-height: 44px; font-size: 14px; }
   .card-topline span { font-size: 12px; }
 }
+
+/* ===== Bandeau démo : le texte ne passe plus sous le bouton « ? » ===== */
+@media (max-width: 620px) {
+  .demo-banner > span:nth-of-type(2) { width: auto; flex: 1 1 auto; box-sizing: border-box; padding-right: 36px; }
+  .demo-banner button { right: 12px; }
+}
+
+/* ===== Mise en page téléphone calquée sur SasPay ===== */
+@media (max-width: 620px) {
+  /* Barre du haut : menu à gauche, cloche à droite, sans fil d'Ariane */
+  .topbar { min-height: 60px; padding: 0 16px; justify-content: space-between; background: #fff; }
+  .topbar .breadcrumb { display: none; }
+  /* Pas de ligne de date au-dessus du titre, comme sur SasPay */
+  .eyebrow { display: none; }
+  .content-wrap { padding: 16px 16px 32px; gap: 16px; }
+  /* Titre et sous-titre sobres */
+  .welcome-copy h1 { font-size: 24px; font-weight: 700; letter-spacing: -.4px; line-height: 1.2; }
+  .welcome-copy p { font-size: 14px; line-height: 1.5; color: #7d877f; margin-top: 4px; }
+  /* Bouton principal pleine largeur, comme « Demander un retrait » */
+  .primary-button { min-height: 48px; width: 100%; border-radius: 12px; font-size: 15px; font-weight: 650; justify-content: center; }
+  /* Champs de recherche : hauteur confortable, arrondis */
+  input[type="search"], .search-field, .search-input { height: 48px; border-radius: 12px; border: 1px solid #e3e8e3; font-size: 15px; padding: 0 14px 0 40px; }
+  /* Cartes : blanches, compactes, lignes nettes */
+  .summary-card, .panel, .demo-banner { border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(20, 40, 30, .05); }
+  .panel-heading h2 { font-size: 16px; font-weight: 650; }
+  .panel-heading p { font-size: 12px; color: #8d978f; }
+  .summary-amount { font-size: 20px; font-weight: 700; }
+  .card-topline span { font-size: 13px; color: #7d877f; }
+  /* Listes et tableaux : lignes aérées, séparateurs fins */
+  .table-scroll table th { font-size: 12px; font-weight: 600; color: #8d978f; text-transform: none; letter-spacing: 0; padding: 12px 8px; }
+  .table-scroll table td { padding: 14px 8px; font-size: 14px; border-bottom: 1px solid #eef1ee; }
+}
+
+/* ===== Tout le site sur téléphone : tailles agrandies, style SasPay ===== */
+@media (max-width: 620px) {
+  /* Accueil */
+  .landing-page h1, .hero-copy h1 { font-size: 44px; line-height: 1.04; letter-spacing: -1.2px; }
+  .landing-page h2, .fees-copy h2, .api-copy h2, .country-band-copy h2 { font-size: 36px; line-height: 1.08; letter-spacing: -.9px; }
+  .landing-page p, .hero-copy p, .fees-copy p, .api-copy p { font-size: 18px; line-height: 1.6; }
+  .hero-kicker { font-size: 12px; }
+  .landing-cta, .hero-actions a, .hero-actions button { min-height: 58px; font-size: 18px; padding: 0 26px; border-radius: 16px; }
+  .landing-text-link { font-size: 17px; }
+  .country-chip { min-height: 52px; padding: 10px 16px; font-size: 16px; border-radius: 14px; }
+  .landing-nav { min-height: 72px; }
+  .landing-brand { font-size: 22px; }
+  .landing-login { font-size: 17px; }
+  .landing-footer, .landing-links { font-size: 15px; }
+
+  /* Tableau de bord */
+  .welcome-copy h1 { font-size: 30px; line-height: 1.15; letter-spacing: -.6px; }
+  .welcome-copy p { font-size: 16px; line-height: 1.5; }
+  .primary-button { min-height: 56px; font-size: 17px; border-radius: 14px; }
+  .summary-card, .panel, .demo-banner { padding: 20px; border-radius: 18px; }
+  .panel-heading h2 { font-size: 20px; }
+  .panel-heading p { font-size: 14px; }
+  .summary-amount { font-size: 28px; }
+  .balance-amount { font-size: 32px; }
+  .card-topline span { font-size: 15px; }
+  .table-scroll table th { font-size: 13px; padding: 14px 10px; }
+  .table-scroll table td { font-size: 16px; padding: 16px 10px; }
+  .demo-banner { font-size: 15px; }
+  input[type="search"], .search-field, .search-input { height: 56px; font-size: 17px; }
+  .topbar { min-height: 68px; }
+  .content-wrap { padding: 20px 18px 40px; gap: 20px; }
+
+  /* Documentation */
+  .dx h1 { font-size: 34px; }
+  .dx h2 { font-size: 26px; }
+  .dx h3 { font-size: 19px; }
+  .dx p, .dx li, .dx-note, .dx-lead { font-size: 17px; }
+  .dx-side a { font-size: 16px; padding: 10px 12px; }
+  .dx-code pre { font-size: 14px; }
+  .dx-step b { width: 32px; height: 32px; font-size: 15px; }
+}
+
+/* ===== Pages Tarification et Retraits, et pays en défilement (téléphone) ===== */
+.page-search { display: flex; align-items: center; gap: 10px; margin: 16px 0; height: 52px; border: 1px solid #e3e8e3; border-radius: 14px; background: #fff; padding: 0 14px; }
+.page-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; }
+.page-primary { margin-bottom: 4px; }
+@media (max-width: 620px) {
+  .workspace-view .view-intro h2 { font-size: 26px; }
+  .workspace-view .view-intro p { font-size: 15px; }
+  .panel table th, .panel table td { white-space: nowrap; }
+  .panel table td { font-size: 15px; padding: 14px 10px; }
+  /* Pays de l'accueil : une seule rangée qui défile horizontalement */
+  .landing-country-band { padding-left: 18px; padding-right: 0; }
+  .country-marquee { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin-right: -18px; padding-right: 18px; }
+  .country-marquee::-webkit-scrollbar { display: none; }
+  .country-track { display: flex; flex-wrap: nowrap; width: max-content; gap: 12px; animation: none; transform: none; }
+  .country-chip { flex: 0 0 auto; min-height: 56px; font-size: 17px; padding: 12px 18px; border-radius: 16px; }
+}
