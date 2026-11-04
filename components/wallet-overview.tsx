@@ -16,6 +16,9 @@ type WalletData = {
   fee: { withdrawal: number; conversion: number };
 };
 
+// Devises des pays FlashPay, affichées dès l'ouverture du tableau de bord.
+const DEFAULT_WALLETS = ["XAF", "CDF", "XOF", "NGN", "RWF", "GHS", "KES"];
+
 const fmt = (value: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(value);
 const kindLabel: Record<string, string> = {
   collection: "Encaissement",
@@ -87,6 +90,7 @@ export default function WalletOverview() {
       <div><button style={button} type="button" onClick={() => { setError(""); void load(); }}>Réessayer</button></div>
     </div>
   );
+  const shownWallets = data && data.wallets.length > 0 ? data.wallets : DEFAULT_WALLETS.map((code) => ({ currency_code: code, balance: 0 }));
   if (!data) return (
     <div style={card} aria-busy="true">
       <strong style={{ fontSize: 14 }}>Mes portefeuilles</strong>
@@ -103,14 +107,7 @@ export default function WalletOverview() {
         <span style={{ fontSize: 12, color: "#6b7f74" }}>Abonnement : {data.plan ? (data.plan === "premium" ? "Premium" : "Basic") : "aucun"}</span>
       </div>
 
-      {data.wallets.length === 0 && (
-        <div style={card}>
-          <strong style={{ fontSize: 14 }}>Pas encore de portefeuille</strong>
-          <p style={{ margin: "6px 0 0", fontSize: 13, color: "#6b7f74" }}>Il apparaît après ton premier encaissement réussi.</p>
-        </div>
-      )}
-
-      {data.wallets.map((wallet) => (
+      {shownWallets.map((wallet) => (
         <div key={wallet.currency_code} style={card}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
             <span style={{ fontSize: 12, color: "#6b7f74", fontWeight: 600 }}>{wallet.currency_code}</span>
