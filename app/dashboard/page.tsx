@@ -42,7 +42,7 @@ type Payment = {
 
 type Country = { code: string; name: string; currency: string };
 
-const navigation = [
+const navigation: { label: string; icon: typeof Wallet; badge?: string }[] = [
   { label: "Vue d’ensemble", icon: LayoutDashboard },
   { label: "Transactions", icon: ArrowDownLeft },
   { label: "Liens de paiement", icon: Link2 },
