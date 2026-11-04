@@ -42,6 +42,15 @@ type Payment = {
 
 type Country = { code: string; name: string; currency: string };
 
+// Date du jour calculée après le rendu côté navigateur (évite l'erreur de pré-rendu).
+function TodayLabel() {
+  const [label, setLabel] = useState("");
+  useEffect(() => {
+    setLabel(new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).toUpperCase());
+  }, []);
+  return <>{label}</>;
+}
+
 const navigation: { label: string; icon: typeof Wallet; badge?: string }[] = [
   { label: "Vue d’ensemble", icon: LayoutDashboard },
   { label: "Transactions", icon: ArrowDownLeft },
@@ -249,7 +258,7 @@ export default function Home() {
         </header>
 
         <div className="content-wrap">
-          <section className="welcome-row"><div className="welcome-copy"><div className="eyebrow"><span className="eyebrow-dot" /> {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).toUpperCase()}</div><h1>Bonjour <span className="wave-mark">✳</span></h1><p>{heading}</p></div><button className="primary-button" onClick={() => { setNotice(""); setCollectionOpen(true); }}><Plus size={18} strokeWidth={2.2} /><span>Nouvelle collecte</span></button></section>
+          <section className="welcome-row"><div className="welcome-copy"><div className="eyebrow"><span className="eyebrow-dot" /> <TodayLabel /></div><h1>Bonjour <span className="wave-mark">✳</span></h1><p>{heading}</p></div><button className="primary-button" onClick={() => { setNotice(""); setCollectionOpen(true); }}><Plus size={18} strokeWidth={2.2} /><span>Nouvelle collecte</span></button></section>
           <div className="demo-banner"><span className="demo-pulse" /><strong>Mode démonstration</strong><span>Les paiements affichés sont simulés. Aucun fonds réel ne circule.</span><button aria-label="En savoir plus" onClick={() => setNotice("Le mode réel nécessite vos identifiants API côté serveur et l’accord du prestataire de paiement pour les encaissements destinés à des tiers.")}><CircleHelp size={15} /></button></div>
           {notice && <div className="notice-bar" role="status"><Check size={16} /><span>{notice}</span><button aria-label="Fermer" onClick={() => setNotice("")}><X size={15} /></button></div>}
 
