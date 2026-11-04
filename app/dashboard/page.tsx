@@ -48,6 +48,7 @@ const navigation = [
   { label: "Liens de paiement", icon: Link2 },
   { label: "Bénéficiaires", icon: UsersRound },
   { label: "Développeurs", icon: Code2 },
+  { label: "Portefeuille", icon: Wallet },
 ];
 
 // Aucune transaction fictive : la liste se remplira avec les vraies transactions.
@@ -91,6 +92,10 @@ function WorkspacePanel({ section, notify, onNewCollection }: { section: string;
   }
 
   if (section === "Développeurs") return <ApiKeyManager />;
+
+  if (section === "Portefeuille") {
+    return <section className="workspace-view"><div className="view-intro"><span className="view-icon"><Wallet size={19} /></span><div><h2>Portefeuille</h2><p>Soldes par devise, retraits, conversions et abonnement.</p></div></div><a className="primary-button" href="/wallet">Ouvrir mon portefeuille</a></section>;
+  }
 
   if (section === "Liens de paiement") {
     return <section className="workspace-view"><div className="view-intro"><span className="view-icon"><Link2 size={19} /></span><div><h2>Collecte de paiement</h2><p>Déclenchez une demande depuis votre interface FlashPay personnalisée.</p></div><button className="primary-button" onClick={onNewCollection}><Plus size={17} />Nouvelle collecte</button></div><article className="panel integration-card"><div className="integration-icon"><Sparkles size={20} /></div><h2>Un parcours de paiement à votre image</h2><p>FlashPay récupère les moyens de paiement disponibles auprès du prestataire de paiement, déclenche une demande côté serveur et attend une confirmation signée. Le client confirme sur son portefeuille mobile; la page ne marque jamais un paiement comme reçu sur la seule base d’une redirection.</p><div className="integration-steps"><span><i>01</i>Choix du pays et de l’opérateur</span><span><i>02</i>Confirmation sur mobile</span><span><i>03</i>Réception du webhook</span></div><div className="provider-note"><ShieldCheck size={16} /><span>Le paiement utilise un checkout hébergé par le prestataire pour le Nigeria. Les autres opérateurs mobiles suivent le parcours intégré documenté.</span></div></article></section>;
