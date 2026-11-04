@@ -22,6 +22,7 @@ import {
   Sparkles,
   UsersRound,
   Wallet,
+  Percent,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -29,6 +30,7 @@ import type { FormEvent } from "react";
 import { SUPPORTED_COUNTRIES } from "@/lib/countries";
 import ApiKeyManager from "@/components/api-key-manager";
 import WalletOverview from "@/components/wallet-overview";
+import { RetraitsView, TarificationView } from "@/components/dashboard-pages";
 
 type Payment = {
   reference: string;
@@ -59,6 +61,8 @@ const navigation: { label: string; icon: typeof Wallet; badge?: string }[] = [
   { label: "Bénéficiaires", icon: UsersRound },
   { label: "Développeurs", icon: Code2 },
   { label: "Portefeuille", icon: Wallet },
+  { label: "Tarification", icon: Percent },
+  { label: "Retraits", icon: Download },
 ];
 
 // Aucune transaction fictive : la liste se remplira avec les vraies transactions.
@@ -102,6 +106,8 @@ function WorkspacePanel({ section, notify, onNewCollection }: { section: string;
   }
 
   if (section === "Développeurs") return <ApiKeyManager />;
+  if (section === "Tarification") return <TarificationView />;
+  if (section === "Retraits") return <RetraitsView />;
 
   if (section === "Portefeuille") {
     return <section className="workspace-view"><div className="view-intro"><span className="view-icon"><Wallet size={19} /></span><div><h2>Portefeuille</h2><p>Soldes par devise, retraits, conversions et abonnement.</p></div></div><div style={{ marginTop: 14 }}><WalletOverview /></div></section>;
