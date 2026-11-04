@@ -38,6 +38,8 @@ export default function WalletPage() {
   const [fromCurrency, setFromCurrency] = useState("");
   const [toCurrency, setToCurrency] = useState("");
   const [convertAmount, setConvertAmount] = useState("");
+  const [subForm, setSubForm] = useState({ plan: "basic", country: "CM", mobile: "", method: "MTN" });
+  const [subBusy, setSubBusy] = useState(false);
 
   async function load() {
     try {
@@ -92,6 +94,32 @@ export default function WalletPage() {
     );
   }
 
+  async function subscribe(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plan: subForm.plan,
+          country_code: subForm.country,
+          mobile: subForm.mobile,
+          payment_method: subForm.method,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message ?? "Impossible de lancer le paiement.");
+      // Le client finalise le paiement sur son téléphone. Le plan s'active automatiquement à la confirmation.
+      window.location.href = result.data.payment_link;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Impossible de lancer le paiement.");
+    } finally {
+      setSubBusy(false);
+    }
+  }
+
   if (!data) {
     return <main style={{ padding: 16 }}><p>{message || "Chargement de ton portefeuille…"}</p></main>;
   }
@@ -111,6 +139,35 @@ export default function WalletPage() {
         {data.wallets.map((w) => (
           <p key={w.currency_code}><strong>{fmt(w.balance)} {w.currency_code}</strong></p>
         ))}
+      </section>
+
+      <section>
+        <h2>Abonnement</h2>
+        <p>Basic : 10 000 FCFA par mois, 1 % sur les encaissements et conversions, retrait à 5 %, plafond de 200 000 FCFA encaissés par mois.</p>
+        <p>Premium : 25 000 FCFA par mois, 1 % sur les encaissements et conversions, retrait gratuit, plafond de 500 000 FCFA par mois (encaissements et retraits).</p>
+        <form onSubmit={subscribe} style={{ display: "grid", gap: 8 }}>
+          <select value={subForm.plan} onChange={(event) => setSubForm({ ...subForm, plan: event.target.value })}>
+            <option value="basic">Basic · 10 000 FCFA / mois</option>
+            <option value="premium">Premium · 25 000 FCFA / mois</option>
+          </select>
+          <select value={subForm.country} onChange={(event) => setSubForm({ ...subForm, country: event.target.value })}>
+            <option value="CM">Cameroun</option>
+            <option value="SN">Sénégal</option>
+            <option value="BF">Burkina Faso</option>
+            <option value="BJ">Bénin</option>
+            <option value="CI">Côte d’Ivoire</option>
+            <option value="TG">Togo</option>
+            <option value="ML">Mali</option>
+            <option value="CG">Congo-Brazzaville</option>
+          </select>
+          <select value={subForm.method} onChange={(event) => setSubForm({ ...subForm, method: event.target.value })}>
+            <option value="MTN">MTN</option>
+            <option value="ORANGE">Orange</option>
+          </select>
+          <input inputMode="tel" placeholder="Numéro mobile money (sans indicatif)" value={subForm.mobile} onChange={(event) => setSubForm({ ...subForm, mobile: event.target.value })} required />
+          <button disabled={subBusy || !subForm.mobile} type="submit">{subBusy ? "Ouverture du paiement…" : "Payer l’abonnement"}</button>
+        </form>
+        <p>Ton plan s’active automatiquement dès que le paiement est confirmé.</p>
       </section>
 
       <section>
