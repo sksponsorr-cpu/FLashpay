@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Check, Copy, KeyRound, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import WebhookSettings from "@/components/webhook-settings";
 
 type ApiKeyRecord = {
   id: string;
@@ -119,6 +120,7 @@ export default function ApiKeyManager() {
       {loading ? <p className="empty-keys">Chargement des clés…</p> : keys.length === 0 ? <p className="empty-keys">Aucune clé pour le moment.</p> : <div className="key-list">{keys.map((item) => <div className="key-row" key={item.id}><span className="key-row-icon"><KeyRound size={16} /></span><div className="key-row-copy"><strong>{item.name}</strong><code>{item.key_prefix}••••••••••••</code></div><span className={item.revoked_at ? "key-status key-revoked" : "key-status"}>{item.revoked_at ? "Révoquée" : `Active · ${item.environment}`}</span>{!item.revoked_at && <button aria-label={`Révoquer ${item.name}`} className="key-revoke" disabled={busy} onClick={() => void revokeKey(item.id)}><Trash2 size={16} /></button>}</div>)}</div>}
     </article>
 
+    <WebhookSettings />
     <p className="security-note"><ShieldCheck size={15} /> FlashPay ne conserve jamais une clé en clair. Chaque clé est montrée une seule fois puis stockée sous forme hachée.</p>
   </section>;
 }
