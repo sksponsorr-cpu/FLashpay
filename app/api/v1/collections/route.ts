@@ -3,6 +3,8 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getSupportedCountry } from "@/lib/countries";
 
+const RATE_LIMIT_PER_MINUTE = 60;
+
 export async function POST(request: Request) {
   const key = request.headers.get("x-flashpay-key");
   if (key?.startsWith("fp_live_")) {
@@ -23,6 +25,27 @@ export async function POST(request: Request) {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
   const keyHash = createHash("sha256").update(key).digest("hex");
+
+  // Limite de requêtes par clé. Ce contrôle utilise la clé service role, réservée au serveur.
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (serviceKey) {
+    const admin = createSupabaseClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+    });
+    const { data: allowed, error: rateError } = await admin.rpc("check_api_rate_limit", {
+      p_key_hash: keyHash,
+      p_limit: RATE_LIMIT_PER_MINUTE,
+    });
+    if (rateError) {
+      return NextResponse.json({ message: "Le contrôle des requêtes est indisponible. Réessaie plus tard." }, { status: 503 });
+    }
+    if (allowed === false) {
+      return NextResponse.json(
+        { message: "Trop de requêtes pour cette clé. Réessaie dans une minute." },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
+  }
 
   let body: { country_code?: string; amount?: number; mobile?: string; name?: string; transaction_id?: string; payment_method?: string };
   try {
