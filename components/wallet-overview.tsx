@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
-// Portefeuilles par devise, affichés directement dans la vue d'ensemble.
-// Chaque carte s'ouvre pour faire un retrait ou une conversion, sans quitter le tableau de bord.
+// Portefeuilles réels par devise : un bloc par devise, retrait et conversion en ligne.
 
 type Wallet = { currency_code: string; balance: number };
 type Movement = { id: string; currency_code: string; kind: string; amount: number; created_at: string };
@@ -16,10 +15,15 @@ type WalletData = {
   fee: { withdrawal: number; conversion: number };
 };
 
-// Devises des pays FlashPay, affichées dès l'ouverture du tableau de bord.
-const DEFAULT_WALLETS = ["XAF", "CDF", "XOF", "NGN", "RWF", "GHS", "KES"];
+const currencyLabel: Record<string, string> = {
+  XAF: "Franc CFA (CEMAC)",
+  XOF: "Franc CFA (UEMOA)",
+  CDF: "Franc congolais",
+  NGN: "Naira nigérian",
+  RWF: "Franc rwandais",
+  USD: "Dollar américain",
+};
 
-const fmt = (value: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(value);
 const kindLabel: Record<string, string> = {
   collection: "Encaissement",
   withdrawal: "Retrait",
@@ -28,10 +32,8 @@ const kindLabel: Record<string, string> = {
   adjustment: "Ajustement",
 };
 
-const card = { background: "#fff", borderRadius: 16, padding: 14, boxShadow: "0 1px 2px rgba(20,36,28,.06)" } as const;
-const field = { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #dfe6e1", fontSize: 14 } as const;
-const button = { background: "#1f6b4c", color: "#fff", border: 0, borderRadius: 10, padding: "10px 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" } as const;
-const ghost = { background: "#eef4f0", color: "#1f6b4c", border: 0, borderRadius: 10, padding: "10px 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" } as const;
+const fmt = (value: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(value);
+const dateFmt = (value: string) => new Date(value).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default function WalletOverview() {
   const [data, setData] = useState<WalletData | null>(null);
@@ -72,7 +74,7 @@ export default function WalletOverview() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Demande refusée.");
-      setNotice("Demande enregistrée. FlashPay la traite.");
+      setNotice("Demande enregistrée. FlashPay la traite manuellement.");
       setOpen(null);
       setAmount("");
       await load();
@@ -83,79 +85,77 @@ export default function WalletOverview() {
     }
   }
 
-  if (error) return (
-    <div style={{ ...card, display: "grid", gap: 8 }} role="alert">
-      <strong style={{ fontSize: 14 }}>Portefeuille indisponible</strong>
-      <p style={{ margin: 0, fontSize: 13, color: "#8a5a00" }}>{error}</p>
-      <div><button style={button} type="button" onClick={() => { setError(""); void load(); }}>Réessayer</button></div>
-    </div>
-  );
-  const shownWallets = data && data.wallets.length > 0 ? data.wallets : DEFAULT_WALLETS.map((code) => ({ currency_code: code, balance: 0 }));
-  if (!data) return (
-    <div style={card} aria-busy="true">
-      <strong style={{ fontSize: 14 }}>Mes portefeuilles</strong>
-      <p style={{ margin: "6px 0 0", fontSize: 13, color: "#6b7f74" }}>Chargement du portefeuille…</p>
-    </div>
-  );
+  if (error) return <p className="fp-muted">{error}</p>;
+  if (!data) return <p className="fp-muted">Chargement de tes portefeuilles…</p>;
 
   const minimumFor = (currency: string) => data.minimums.find((m) => m.currency_code === currency)?.minimum_amount;
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h3 style={{ margin: 0, fontSize: 16 }}>Mes portefeuilles</h3>
-        <span style={{ fontSize: 12, color: "#6b7f74" }}>Abonnement : {data.plan ? (data.plan === "premium" ? "Premium" : "Basic") : "aucun"}</span>
-      </div>
-
-      {shownWallets.map((wallet) => (
-        <div key={wallet.currency_code} style={card}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-            <span style={{ fontSize: 12, color: "#6b7f74", fontWeight: 600 }}>{wallet.currency_code}</span>
-            <span style={{ fontSize: 12, color: "#6b7f74" }}>Retrait : {data.fee.withdrawal} % · Conversion : {data.fee.conversion} %</span>
-          </div>
-          <div style={{ fontSize: 24, fontWeight: 800, marginTop: 4 }}>{fmt(wallet.balance)} <span style={{ fontSize: 13, color: "#6b7f74" }}>{wallet.currency_code}</span></div>
-          {minimumFor(wallet.currency_code) !== undefined && (
-            <div style={{ fontSize: 12, color: "#6b7f74", marginTop: 2 }}>Retrait minimum : {fmt(minimumFor(wallet.currency_code)!)} {wallet.currency_code}</div>
-          )}
-
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
-            <button style={button} onClick={() => { setOpen({ currency: wallet.currency_code, mode: "withdraw" }); setAmount(""); }}>Retirer</button>
-            <button style={ghost} onClick={() => { setOpen({ currency: wallet.currency_code, mode: "convert" }); setAmount(""); }}>Convertir</button>
-          </div>
-
-          {open && open.currency === wallet.currency_code && (
-            <form onSubmit={submit} style={{ display: "grid", gap: 8, marginTop: 12, borderTop: "1px solid #eef2ef", paddingTop: 12 }}>
-              <strong style={{ fontSize: 14 }}>{open.mode === "withdraw" ? "Demande de retrait" : "Demande de conversion"}</strong>
-              {open.mode === "convert" && (
-                <input style={field} placeholder="Vers (ex. USD)" value={toCurrency} onChange={(event) => setToCurrency(event.target.value)} required />
-              )}
-              <input style={field} inputMode="decimal" placeholder={`Montant en ${wallet.currency_code}`} value={amount} onChange={(event) => setAmount(event.target.value)} required />
-              <span style={{ fontSize: 12, color: "#6b7f74" }}>
-                {open.mode === "withdraw"
-                  ? `Tu reçois le montant demandé moins ${data.fee.withdrawal} %.`
-                  : `Frais de conversion : ${data.fee.conversion} %. Le taux est appliqué par FlashPay.`}
-              </span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button style={button} disabled={busy || !amount} type="submit">{busy ? "Envoi…" : "Confirmer"}</button>
-                <button style={ghost} type="button" onClick={() => setOpen(null)}>Annuler</button>
-              </div>
-            </form>
-          )}
+    <div className="fp-wallets">
+      {data.wallets.length === 0 && (
+        <div className="fp-empty-card">
+          <strong>Aucun portefeuille pour le moment</strong>
+          <p>Un portefeuille apparaît automatiquement dans la devise de ton pays dès ton premier encaissement réussi.</p>
         </div>
-      ))}
+      )}
 
-      {notice && <p role="status" style={{ fontSize: 13, color: "#1f6b4c", margin: 0 }}>{notice}</p>}
+      <div className="fp-wallet-grid">
+        {data.wallets.map((wallet) => (
+          <article className="fp-wallet-card" key={wallet.currency_code}>
+            <div className="fp-wallet-head">
+              <span className="fp-code">{wallet.currency_code}</span>
+              <span className="fp-small">{currencyLabel[wallet.currency_code] ?? wallet.currency_code}</span>
+            </div>
+            <div className="fp-wallet-balance">{fmt(wallet.balance)} <small>{wallet.currency_code}</small></div>
+            <div className="fp-wallet-meta">
+              Retrait {data.fee.withdrawal} % · Conversion {data.fee.conversion} %
+              {minimumFor(wallet.currency_code) !== undefined && <> · Minimum {fmt(minimumFor(wallet.currency_code)!)} {wallet.currency_code}</>}
+            </div>
+            <div className="fp-actions">
+              <button className="fp-btn" onClick={() => { setOpen({ currency: wallet.currency_code, mode: "withdraw" }); setAmount(""); }}>Retirer</button>
+              <button className="fp-btn fp-btn-ghost" onClick={() => { setOpen({ currency: wallet.currency_code, mode: "convert" }); setAmount(""); }}>Convertir</button>
+            </div>
 
-      <div style={card}>
-        <strong style={{ fontSize: 14 }}>Derniers mouvements</strong>
-        {data.movements.length === 0 && <p style={{ margin: "6px 0 0", fontSize: 13, color: "#6b7f74" }}>Aucun mouvement pour le moment.</p>}
-        {data.movements.slice(0, 8).map((m) => (
-          <div key={m.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "8px 0", borderTop: "1px solid #eef2ef", marginTop: 8 }}>
-            <span>{kindLabel[m.kind] ?? m.kind}</span>
-            <span style={{ fontWeight: 700 }}>{m.amount > 0 ? "+" : ""}{fmt(m.amount)} {m.currency_code}</span>
-          </div>
+            {open && open.currency === wallet.currency_code && (
+              <form className="fp-form" onSubmit={submit}>
+                <strong>{open.mode === "withdraw" ? "Demande de retrait" : "Demande de conversion"}</strong>
+                {open.mode === "convert" && (
+                  <input className="fp-input" placeholder="Vers (ex. USD)" value={toCurrency} onChange={(event) => setToCurrency(event.target.value)} required />
+                )}
+                <input className="fp-input" inputMode="decimal" placeholder={`Montant en ${wallet.currency_code}`} value={amount} onChange={(event) => setAmount(event.target.value)} required />
+                <span className="fp-small">
+                  {open.mode === "withdraw"
+                    ? `Tu reçois le montant demandé moins ${data.fee.withdrawal} %.`
+                    : `Frais de conversion : ${data.fee.conversion} %. Le taux est appliqué par FlashPay.`}
+                </span>
+                <div className="fp-actions">
+                  <button className="fp-btn" disabled={busy || !amount} type="submit">{busy ? "Envoi…" : "Confirmer"}</button>
+                  <button className="fp-btn fp-btn-ghost" type="button" onClick={() => setOpen(null)}>Annuler</button>
+                </div>
+              </form>
+            )}
+          </article>
         ))}
       </div>
+
+      {notice && <p role="status" className="fp-notice">{notice}</p>}
+
+      <article className="fp-card">
+        <div className="fp-card-head">
+          <h3>Derniers mouvements</h3>
+          <span className="fp-small">Abonnement : {data.plan ? (data.plan === "premium" ? "Premium" : "Basic") : "aucun"}</span>
+        </div>
+        {data.movements.length === 0 && <p className="fp-muted">Aucun mouvement pour le moment.</p>}
+        {data.movements.slice(0, 10).map((m) => (
+          <div className="fp-row" key={m.id}>
+            <div>
+              <strong>{kindLabel[m.kind] ?? m.kind}</strong>
+              <span className="fp-small">{dateFmt(m.created_at)}</span>
+            </div>
+            <strong className={m.amount > 0 ? "fp-plus" : ""}>{m.amount > 0 ? "+" : ""}{fmt(m.amount)} {m.currency_code}</strong>
+          </div>
+        ))}
+      </article>
     </div>
   );
 }
