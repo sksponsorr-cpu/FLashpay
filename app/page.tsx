@@ -10,8 +10,9 @@ const formatMoney = (value: number) => new Intl.NumberFormat("fr-FR", { maximumF
 
 export default function LandingPage() {
   const [amount, setAmount] = useState(100000);
-  const [platformRate, setPlatformRate] = useState(1);
-  const [passFee, setPassFee] = useState(true);
+  // Commission FlashPay fixe : 6 % pour toutes les devises. Les frais Swychr (2,5 %) sont payés par le payeur.
+  const platformRate = 6;
+  const passFee = true;
   const [feeCountryCode, setFeeCountryCode] = useState("CM");
   const selectedCountry = SUPPORTED_COUNTRIES.find((country) => country.code === feeCountryCode) ?? SUPPORTED_COUNTRIES[0];
   const processorFee = passFee ? 0 : amount - amount / (1 + processorRate / 100);
@@ -60,11 +61,10 @@ export default function LandingPage() {
       <section className="landing-country-band" id="countries"><div className="section-overline">UN MÊME ESPACE, PLUSIEURS MARCHÉS</div><div className="country-band-copy"><h2>Conçu pour les réalités locales.</h2><p>Pays ciblés. Méthodes de paiement confirmées selon la disponibilité des opérateurs.</p></div><div className="country-marquee"><div className="country-track">{SUPPORTED_COUNTRIES.map((country) => <span className="country-chip" key={country.code}><i>{country.code}</i>{country.name}</span>)}</div></div><div className="country-note"><CircleHelp size={15} /> Être dans cette liste ne garantit pas la disponibilité des opérateurs. FlashPay vérifie les méthodes disponibles avant chaque demande.</div></section>
 
       <section className="landing-fees" id="fees">
-        <div className="fees-copy"><span className="section-overline">DES CHIFFRES LISIBLES</span><h2>Chaque frais,<br /><span>à sa place.</span></h2><p>Les frais de traitement de base sont de 2,5 %. Ton accord peut prévoir un autre taux selon le pays. Simule l’effet d’une commission FlashPay avant de fixer ton offre.</p><div className="fees-disclaimer"><ShieldCheck size={16} /><span>Estimation uniquement. Le taux de ton accord fait foi.</span></div></div>
+        <div className="fees-copy"><span className="section-overline">DES CHIFFRES LISIBLES</span><h2>Chaque frais,<br /><span>à sa place.</span></h2><p>La commission FlashPay est de 6 % sur chaque encaissement. Les frais de traitement de 2,5 % sont ajoutés au montant : le client paie le montant + 2,5 %, et tu reçois le montant demandé moins la commission.</p><div className="fees-disclaimer"><ShieldCheck size={16} /><span>Estimation uniquement. Le taux de ton accord fait foi.</span></div></div>
         <div className="fee-tool" aria-label="Simulateur indicatif des frais"><div className="fee-tool-head"><div><span className="tool-kicker">SIMULATEUR INDICATIF</span><h3>Estime une collecte</h3></div><label className="tool-currency"><span className="sr-only">Pays de simulation</span><select aria-label="Pays de simulation" onChange={(event) => setFeeCountryCode(event.target.value)} style={{ appearance: "none", border: 0, outline: 0, background: "transparent", color: "inherit", font: "inherit", cursor: "pointer" }} value={feeCountryCode}>{SUPPORTED_COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.code} · {country.currency}</option>)}</select><ChevronDown size={13} /></label></div>
           <label className="tool-label" htmlFor="fee-amount">Montant de la collecte</label><div className="tool-amount"><input id="fee-amount" min="100" onChange={(event) => setAmount(Math.max(100, Number(event.target.value) || 100))} type="number" value={amount} /><span>{selectedCountry.currency}</span></div>
-          <label className="fee-toggle"><span><strong>Faire payer les frais de traitement au client</strong><small>+{processorRate}% estimés</small></span><input checked={passFee} onChange={(event) => setPassFee(event.target.checked)} type="checkbox" /><i /></label>
-          <div className="fee-slider-head"><label htmlFor="fee-rate">Commission FlashPay envisagée</label><strong>{platformRate.toFixed(1)}%</strong></div><input className="fee-slider" id="fee-rate" max="5" min="0" onChange={(event) => setPlatformRate(Number(event.target.value))} step="0.1" type="range" value={platformRate} />
+          <div className="fee-slider-head"><label>Commission FlashPay</label><strong>{platformRate.toFixed(1)}%</strong></div>
           <div className="fee-breakdown"><div><span>Le client paie</span><strong>{formatMoney(customerPays)} {selectedCountry.currency}</strong></div><div><span>Frais de traitement estimés</span><strong>{formatMoney(processorFee)} {selectedCountry.currency}</strong></div><div><span>Commission FlashPay simulée</span><strong>{formatMoney(platformFee)} {selectedCountry.currency}</strong></div><div className="fee-net"><span>Montant estimé pour le bénéficiaire</span><strong>{formatMoney(recipientEstimate)} {selectedCountry.currency}</strong></div></div>
           <p className="fee-tool-foot">Simulation sans effet sur les paiements. La commission doit être validée contractuellement.</p>
         </div>
