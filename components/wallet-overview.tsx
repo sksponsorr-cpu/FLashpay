@@ -80,8 +80,19 @@ export default function WalletOverview() {
     }
   }
 
-  if (error) return <p style={{ color: "#8a5a00" }}>{error}</p>;
-  if (!data) return <p style={{ color: "#6b7f74" }}>Chargement du portefeuille…</p>;
+  if (error) return (
+    <div style={{ ...card, display: "grid", gap: 8 }} role="alert">
+      <strong style={{ fontSize: 14 }}>Portefeuille indisponible</strong>
+      <p style={{ margin: 0, fontSize: 13, color: "#8a5a00" }}>{error}</p>
+      <div><button style={button} type="button" onClick={() => { setError(""); void load(); }}>Réessayer</button></div>
+    </div>
+  );
+  if (!data) return (
+    <div style={card} aria-busy="true">
+      <strong style={{ fontSize: 14 }}>Mes portefeuilles</strong>
+      <p style={{ margin: "6px 0 0", fontSize: 13, color: "#6b7f74" }}>Chargement du portefeuille…</p>
+    </div>
+  );
 
   const minimumFor = (currency: string) => data.minimums.find((m) => m.currency_code === currency)?.minimum_amount;
 
@@ -101,7 +112,7 @@ export default function WalletOverview() {
 
       {data.wallets.map((wallet) => (
         <div key={wallet.currency_code} style={card}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
             <span style={{ fontSize: 12, color: "#6b7f74", fontWeight: 600 }}>{wallet.currency_code}</span>
             <span style={{ fontSize: 12, color: "#6b7f74" }}>Retrait : {data.fee.withdrawal} % · Conversion : {data.fee.conversion} %</span>
           </div>
@@ -110,7 +121,7 @@ export default function WalletOverview() {
             <div style={{ fontSize: 12, color: "#6b7f74", marginTop: 2 }}>Retrait minimum : {fmt(minimumFor(wallet.currency_code)!)} {wallet.currency_code}</div>
           )}
 
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
             <button style={button} onClick={() => { setOpen({ currency: wallet.currency_code, mode: "withdraw" }); setAmount(""); }}>Retirer</button>
             <button style={ghost} onClick={() => { setOpen({ currency: wallet.currency_code, mode: "convert" }); setAmount(""); }}>Convertir</button>
           </div>
