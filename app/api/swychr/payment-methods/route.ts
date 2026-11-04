@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   }
 
   if (!apiKey) {
-    return NextResponse.json({ message: "La clé Swychr serveur n’est pas configurée." }, { status: 503 });
+    return NextResponse.json({ message: "La clé de paiement serveur n’est pas configurée." }, { status: 503 });
   }
 
   try {
@@ -67,6 +67,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ mode: "live", ...providerResult });
   } catch {
-    return NextResponse.json({ message: "Impossible de récupérer les moyens de paiement Swychr." }, { status: 502 });
+    return NextResponse.json({ message: "Impossible de récupérer les moyens de paiement." }, { status: 502 });
   }
 }
