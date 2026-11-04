@@ -86,9 +86,13 @@ export async function POST(request: Request) {
   // Notification au SaaS du développeur, une seule fois, au moment où le paiement devient « réussi ».
   // Un échec d'envoi n'empêche pas de répondre 200 au prestataire.
   if (data === "SUCCESSFUL") {
-    // Crédit du portefeuille FlashPay du client, net de la commission. Idempotent.
-    await admin.rpc("credit_wallet_for_transaction", { p_transaction_id: attributes.transaction_id });
-    await notifyMerchant(admin, attributes.transaction_id);
+    // Abonnement : plan activé automatiquement. Collecte : portefeuille crédité, net de la commission.
+    const { data: purpose, error: settleError } = await admin.rpc("settle_successful_transaction", {
+      p_transaction_id: attributes.transaction_id,
+    });
+    if (!settleError && purpose === "collection") {
+      await notifyMerchant(admin, attributes.transaction_id);
+    }
   }
 
   return NextResponse.json({ received: true, result: data }, { status: 200 });
