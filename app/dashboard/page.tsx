@@ -1,189 +1,70 @@
 "use client";
 
-import {
-  ArrowDownLeft,
-  ArrowRight,
-  ArrowUpRight,
-  Bell,
-  Check,
-  ChevronDown,
-  Code2,
-  CircleHelp,
-  Clock3,
-  Download,
-  Ellipsis,
-  FileCheck2,
-  LayoutDashboard,
-  Link2,
-  Menu,
-  Plus,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  UsersRound,
-  Wallet,
-  Percent,
-  X,
-} from "lucide-react";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { ArrowDownLeft, Code2, Link2, LayoutDashboard, Menu, Percent, Settings, Wallet, Plus } from "lucide-react";
 import { SUPPORTED_COUNTRIES } from "@/lib/countries";
 import ApiKeyManager from "@/components/api-key-manager";
+import WebhookSettings from "@/components/webhook-settings";
 import WalletOverview from "@/components/wallet-overview";
-import { RetraitsView, TarificationView } from "@/components/dashboard-pages";
-
-type Payment = {
-  reference: string;
-  customer: string;
-  initials: string;
-  amount: number;
-  method: string;
-  date: string;
-  status: "Réussi" | "En attente" | "Échoué";
-  tint: string;
-};
+import TransactionsList from "@/components/transactions-list";
 
 type Country = { code: string; name: string; currency: string };
 
-// Date du jour calculée après le rendu côté navigateur (évite l'erreur de pré-rendu).
+const sections = [
+  { id: "overview", label: "Tableau de bord", icon: LayoutDashboard },
+  { id: "wallet", label: "Portefeuille", icon: Wallet },
+  { id: "transactions", label: "Transactions", icon: ArrowDownLeft },
+  { id: "links", label: "Liens de paiement", icon: Link2 },
+  { id: "developers", label: "Développeurs", icon: Code2 },
+  { id: "pricing", label: "Tarification", icon: Percent },
+  { id: "settings", label: "Paramètres", icon: Settings },
+] as const;
+
+type SectionId = (typeof sections)[number]["id"];
+
+// Date calculée après le rendu navigateur (évite l'erreur de pré-rendu).
 function TodayLabel() {
   const [label, setLabel] = useState("");
   useEffect(() => {
-    setLabel(new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).toUpperCase());
+    setLabel(new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }));
   }, []);
   return <>{label}</>;
 }
 
-const navigation: { label: string; icon: typeof Wallet; badge?: string }[] = [
-  { label: "Vue d’ensemble", icon: LayoutDashboard },
-  { label: "Transactions", icon: ArrowDownLeft },
-  { label: "Liens de paiement", icon: Link2 },
-  { label: "Bénéficiaires", icon: UsersRound },
-  { label: "Développeurs", icon: Code2 },
-  { label: "Portefeuille", icon: Wallet },
-  { label: "Tarification", icon: Percent },
-  { label: "Retraits", icon: Download },
-];
-
-// Aucune transaction fictive : la liste se remplira avec les vraies transactions.
-const starterPayments: Payment[] = [];
-
-const money = (value: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(value);
-
-function WorkspacePanel({ section, notify, onNewCollection }: { section: string; notify: (message: string) => void; onNewCollection: () => void }) {
-  const [documentType, setDocumentType] = useState("Carte nationale d’identité");
-  const [documentName, setDocumentName] = useState("");
-  const [paidRows, setPaidRows] = useState<string[]>([]);
-  // Aucun bénéficiaire fictif : la liste se remplira avec les vrais bénéficiaires.
-  const beneficiaries: { name: string; country: string; amount: number; mobile: string }[] = [];
-
-  if (section === "Vérification d’identité") {
-    return <section className="workspace-view">
-      <div className="view-intro"><span className="view-icon"><ShieldCheck size={19} /></span><div><h2>Vérification d’identité</h2><p>Votre identité doit être validée avant d’activer les encaissements.</p></div></div>
-      <div className="verification-banner"><div className="verification-symbol"><Clock3 size={18} /></div><div><strong>Vérification à compléter</strong><span>Votre compte est en mode démonstration. Les pièces ne sont pas envoyées ni stockées.</span></div><span className="status-pill status-pending"><i />À compléter</span></div>
-      <article className="panel verification-panel"><div className="panel-heading"><div><h2>Pièce d’identité</h2><p>Choisissez un document officiel valide à votre nom.</p></div><span className="step-count">ÉTAPE 1 SUR 2</span></div>
-        <div className="document-options">{["Carte nationale d’identité", "Passeport", "Permis de conduire"].map((type) => <button key={type} className={`document-option ${documentType === type ? "document-option-active" : ""}`} onClick={() => setDocumentType(type)}><FileCheck2 size={17} /><span>{type}</span>{documentType === type && <Check size={16} />}</button>)}</div>
-        <label className="upload-zone"><input accept="image/jpeg,image/png,application/pdf" type="file" onChange={(event) => { const name = event.target.files?.[0]?.name ?? ""; setDocumentName(name); if (name) notify("Fichier sélectionné sur cet appareil uniquement; aucun document n’a été transmis."); }} /><span className="upload-icon"><Plus size={19} /></span><strong>{documentName || "Ajouter une pièce d’identité"}</strong><span>JPG, PNG ou PDF · votre fichier reste sur cet appareil en démo</span></label>
-        <button className="primary-button verify-button" disabled={!documentName} onClick={() => notify("Envoi désactivé en démo. L’upload sera activé après mise en place d’un stockage chiffré et d’un parcours KYC conforme.")}><span>Continuer la vérification</span><ArrowRight size={16} /></button>
-        <p className="security-note"><ShieldCheck size={15} /> En production, vos documents nécessiteront un stockage privé et chiffré.</p>
-      </article>
-    </section>;
-  }
-
-  if (section === "Bénéficiaires") {
-    return <section className="workspace-view">
-      <div className="view-intro"><span className="view-icon"><UsersRound size={19} /></span><div><h2>Versements aux bénéficiaires</h2><p>Suivez les montants à régler manuellement après encaissement confirmé.</p></div><button className="export-button" onClick={() => notify("L’ajout de bénéficiaires sera activé après la mise en place des comptes sécurisés.")}><Plus size={15} />Ajouter</button></div>
-      <div className="demo-banner"><span className="demo-pulse" /><strong>Suivi de démonstration</strong><span>Les montants ci-dessous sont fictifs; aucun versement n’est déclenché.</span></div>
-      <article className="panel payout-panel"><div className="panel-heading"><div><h2>Versements en attente</h2><p>Montants à vérifier et à régler en dehors de FlashPay</p></div><span className="pending-label">0 FCFA à traiter</span></div>
-          <div className="payout-list">{beneficiaries.map((person, index) => <div className="payout-row" key={person.name}><div className={`customer-avatar avatar-${["peach", "blue", "green"][index]}`}>{person.name.split(" ").map((part) => part[0]).join("")}</div><div className="payout-person"><strong>{person.name}</strong><span>{person.country} · {person.mobile}</span></div><strong className="payout-amount">{money(person.amount)} <small>FCFA</small></strong><button className="export-button" disabled={paidRows.includes(person.name)} onClick={() => { setPaidRows((current) => [...current, person.name]); notify("Simulation uniquement : aucun transfert d’argent n’a été effectué."); }}>{paidRows.includes(person.name) ? "Marqué en démo" : "Marquer traité"}</button></div>)}</div>
-        <p className="security-note"><Wallet size={15} /> Les paiements encaissés sont crédités sur le portefeuille marchand. Ce tableau ne déclenche pas de transfert.</p>
-      </article>
-    </section>;
-  }
-
-  if (section === "Transactions") {
-    return <section className="workspace-view"><div className="view-intro"><span className="view-icon"><ArrowDownLeft size={19} /></span><div><h2>Transactions</h2><p>Historique de démonstration des encaissements récents.</p></div><button className="export-button" onClick={() => notify("L’export sera disponible après connexion à un historique persistant.")}><Download size={15} />Exporter</button></div><article className="panel payout-panel"><div className="panel-heading"><div><h2>Toutes les opérations</h2><p>Les statuts réels seront alimentés par les notifications de paiement.</p></div></div><div className="payout-list">{starterPayments.map((payment) => <div className="payout-row" key={payment.reference}><div className={`customer-avatar avatar-${payment.tint}`}>{payment.initials}</div><div className="payout-person"><strong>{payment.customer}</strong><span>{payment.reference} · {payment.method}</span></div><span className={`status-pill status-${payment.status === "Réussi" ? "success" : payment.status === "En attente" ? "pending" : "failed"}`}><i />{payment.status}</span><strong className="payout-amount">{money(payment.amount)} <small>FCFA</small></strong></div>)}</div></article></section>;
-  }
-
-  if (section === "Développeurs") return <ApiKeyManager />;
-  if (section === "Tarification") return <TarificationView />;
-  if (section === "Retraits") return <RetraitsView />;
-
-  if (section === "Portefeuille") {
-    return <section className="workspace-view"><div className="view-intro"><span className="view-icon"><Wallet size={19} /></span><div><h2>Portefeuille</h2><p>Soldes par devise, retraits, conversions et abonnement.</p></div></div><div style={{ marginTop: 14 }}><WalletOverview /></div></section>;
-  }
-
-  if (section === "Liens de paiement") {
-    return <section className="workspace-view"><div className="view-intro"><span className="view-icon"><Link2 size={19} /></span><div><h2>Collecte de paiement</h2><p>Déclenchez une demande depuis votre interface FlashPay personnalisée.</p></div><button className="primary-button" onClick={onNewCollection}><Plus size={17} />Nouvelle collecte</button></div><article className="panel integration-card"><div className="integration-icon"><Sparkles size={20} /></div><h2>Un parcours de paiement à votre image</h2><p>FlashPay récupère les moyens de paiement disponibles auprès du prestataire de paiement, déclenche une demande côté serveur et attend une confirmation signée. Le client confirme sur son portefeuille mobile; la page ne marque jamais un paiement comme reçu sur la seule base d’une redirection.</p><div className="integration-steps"><span><i>01</i>Choix du pays et de l’opérateur</span><span><i>02</i>Confirmation sur mobile</span><span><i>03</i>Réception du webhook</span></div><div className="provider-note"><ShieldCheck size={16} /><span>Le paiement utilise un checkout hébergé par le prestataire pour le Nigeria. Les autres opérateurs mobiles suivent le parcours intégré documenté.</span></div></article></section>;
-  }
-
-  return <section className="workspace-view"><div className="view-intro"><span className="view-icon"><Wallet size={19} /></span><div><h2>Paramètres du compte</h2><p>Profil personnel et préférences de démonstration.</p></div></div><article className="panel settings-card"><div className="settings-row"><div><strong>Profil</strong><span>Compte particulier</span></div><button className="export-button" onClick={() => notify("La gestion du profil sera disponible après ajout de l’authentification.")}>Modifier</button></div><div className="settings-row"><div><strong>Pays de résidence</strong><span>Non renseigné</span></div><span className="settings-state">Compte de démonstration</span></div><div className="settings-row"><div><strong>Mode de paiement</strong><span>Les paiements réels sont désactivés</span></div><span className="settings-state">Démo active</span></div></article></section>;
-}
-
-export default function Home() {
-  const [activeNav, setActiveNav] = useState("Vue d’ensemble");
-  const [collectionOpen, setCollectionOpen] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [payments, setPayments] = useState(starterPayments);
-  const [notice, setNotice] = useState("");
-  const [amount, setAmount] = useState("");
-  const [phone, setPhone] = useState("");
-  const [customer, setCustomer] = useState("");
-  const [method, setMethod] = useState("MTN");
+function CollectionForm({ countryList }: { countryList: Country[] }) {
   const [countryCode, setCountryCode] = useState("CM");
-  const [countryList, setCountryList] = useState<Country[]>(SUPPORTED_COUNTRIES.map((country) => ({ ...country })));
-  const [availableMethods, setAvailableMethods] = useState<string[]>(["MTN", "ORANGE"]);
-  const [methodsError, setMethodsError] = useState("");
-  const [methodsLoading, setMethodsLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [methods, setMethods] = useState<string[]>([]);
+  const [method, setMethod] = useState("");
+  const [amount, setAmount] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let active = true;
-    const loadCountries = async () => {
-      try {
-        const response = await fetch("/api/countries");
-        if (!response.ok) return;
-        const result = await response.json();
-        if (active && Array.isArray(result.countries) && result.countries.length) {
-          setCountryList(result.countries);
-        }
-      } catch {
-        return;
-      }
-    };
-    void loadCountries();
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    setMethodsError("");
+    setMethods([]);
     fetch(`/api/swychr/payment-methods?country_code=${countryCode}`)
       .then(async (response) => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.message ?? "Moyens de paiement indisponibles.");
-        return result.data?.payment_methods?.map((item: { payment_method: string }) => item.payment_method) ?? [];
+        return (result.data?.payment_methods ?? []).map((item: { payment_method: string }) => item.payment_method) as string[];
       })
-      .then((methods: string[]) => {
+      .then((list) => {
         if (!active) return;
-        setAvailableMethods(methods);
-        setMethod(methods[0] ?? "");
+        setMethods(list);
+        setMethod(list[0] ?? "");
       })
       .catch((error) => {
-        if (active) {
-          setAvailableMethods([]);
-          setMethodsError(error instanceof Error ? error.message : "Impossible de joindre le service de paiement.");
-        }
-      })
-      .finally(() => {
-        if (active) setMethodsLoading(false);
+        if (active) setNotice(error instanceof Error ? error.message : "Impossible de joindre le service de paiement.");
       });
     return () => { active = false; };
   }, [countryCode]);
 
-  async function createCollection(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitting(true);
+    setBusy(true);
     setNotice("");
     try {
       const response = await fetch("/api/swychr/collect", {
@@ -191,8 +72,8 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           country_code: countryCode,
-          name: customer,
-          mobile: phone,
+          name,
+          mobile,
           amount: Number(amount),
           transaction_id: `FP-${Date.now()}`,
           payment_method: countryCode === "NG" ? undefined : method,
@@ -201,103 +82,226 @@ export default function Home() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "La collecte n’a pas pu être créée.");
-      if (result.mode === "demo") {
-        setPayments((current) => [{
-          reference: result.transaction_id,
-          customer: customer || "Nouveau client",
-          initials: (customer || "NC").slice(0, 2).toUpperCase(),
-          amount: Number(amount),
-          method: method === "MTN" ? "MTN Mobile Money" : "Orange Money",
-          date: "À l’instant",
-          status: "En attente",
-          tint: "blue",
-        }, ...current]);
-        setNotice("Démo : aucune demande de paiement réelle n’a été envoyée.");
-      } else {
-        if (result.payment_link) {
-          window.location.assign(result.payment_link);
-          return;
-        }
-        setNotice("Demande envoyée. Le paiement sera confirmé automatiquement.");
+      if (result.payment_link) {
+        window.location.assign(result.payment_link);
+        return;
       }
+      setNotice("Demande envoyée au client. Le paiement sera confirmé automatiquement.");
       setAmount("");
-      setPhone("");
-      setCustomer("");
-      setCollectionOpen(false);
+      setMobile("");
+      setName("");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Une erreur est survenue.");
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   }
 
-  const heading = activeNav === "Vue d’ensemble" ? "Votre activité, en un coup d’œil." : activeNav;
+  return (
+    <form className="fp-card fp-form-grid" onSubmit={submit}>
+      <label className="fp-label">Pays
+        <select className="fp-input" value={countryCode} onChange={(event) => setCountryCode(event.target.value)}>
+          {countryList.map((country) => <option key={country.code} value={country.code}>{country.name} · {country.currency}</option>)}
+        </select>
+      </label>
+      {countryCode !== "NG" && (
+        <label className="fp-label">Opérateur
+          <select className="fp-input" value={method} onChange={(event) => setMethod(event.target.value)} required>
+            {methods.length === 0 && <option value="">Aucun opérateur disponible</option>}
+            {methods.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+      )}
+      <label className="fp-label">Nom du client
+        <input className="fp-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex. Aïcha N." />
+      </label>
+      <label className="fp-label">Numéro mobile (sans indicatif)
+        <input className="fp-input" inputMode="tel" value={mobile} onChange={(event) => setMobile(event.target.value)} placeholder="Ex. 690000000" required />
+      </label>
+      <label className="fp-label">Montant
+        <input className="fp-input" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Ex. 45 000" required />
+      </label>
+      <p className="fp-small fp-span">Le client paie le montant + 2,5 % de frais. Tu reçois le montant demandé moins 6 % de commission.</p>
+      <button className="fp-btn fp-span" disabled={busy || !amount || !mobile || !method} type="submit">
+        {busy ? "Envoi…" : <><Plus size={16} /> Créer la demande de paiement</>}
+      </button>
+      {notice && <p role="status" className="fp-notice fp-span">{notice}</p>}
+    </form>
+  );
+}
+
+export default function DashboardPage() {
+  const [active, setActive] = useState<SectionId>("overview");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [countryList, setCountryList] = useState<Country[]>(SUPPORTED_COUNTRIES.map((country) => ({ ...country })));
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/countries")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result) => {
+        if (alive && result && Array.isArray(result.countries) && result.countries.length) setCountryList(result.countries);
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
+
+  const current = sections.find((section) => section.id === active)!;
 
   return (
-    <main className="app-shell">
-      <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
-        <div className="brand-lockup">
-          <div className="brand-mark"><span>f</span><i /></div>
-          <div className="brand-name">flash<span>pay</span><small>ESPACE PERSONNEL</small></div>
-          <button aria-label="Fermer le menu" className="icon-button mobile-close" onClick={() => setMobileNavOpen(false)}><X size={18} /></button>
-        </div>
-        <div className="workspace-switcher"><div className="workspace-avatar">F</div><div className="workspace-copy"><strong>Mon compte</strong><span>Compte personnel</span></div><ChevronDown size={15} /></div>
-        <div className="nav-caption">MENU PRINCIPAL</div>
-        <nav className="main-nav" aria-label="Navigation principale">
-          {navigation.map(({ label, icon: Icon, badge }) => <button className={`nav-item ${activeNav === label ? "nav-item-active" : ""}`} key={label} onClick={() => { setActiveNav(label); setMobileNavOpen(false); }}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{badge && <small className="nav-badge">{badge}</small>}</button>)}
-        </nav>
-        <div className="nav-caption nav-caption-spaced">COMPTE</div>
-        <nav className="main-nav" aria-label="Paramètres du compte">
-          <button className={`nav-item ${activeNav === "Vérification d’identité" ? "nav-item-active" : ""}`} onClick={() => setActiveNav("Vérification d’identité")}><ShieldCheck size={18} strokeWidth={1.8} /><span>Vérification d’identité</span><i className="nav-alert" /></button>
-          <button className={`nav-item ${activeNav === "Paramètres" ? "nav-item-active" : ""}`} onClick={() => setActiveNav("Paramètres")}><Wallet size={18} strokeWidth={1.8} /><span>Paramètres</span></button>
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="support-card"><div className="support-icon"><CircleHelp size={17} /></div><strong>Besoin d’aide ?</strong><p>Notre équipe est là pour vous.</p><button onClick={() => setNotice("Le support FlashPay sera bientôt disponible.")}>Contacter le support <ArrowRight size={14} /></button></div>
-          <div className="profile-row"><div className="profile-avatar">F</div><div className="profile-copy"><strong>Mon compte</strong><span>Identité à vérifier</span></div><Ellipsis size={19} /></div>
-        </div>
-      </aside>
+    <div className="fp-app">
+      <style>{`
+        .fp-app { min-height: 100vh; background: #f4f7f5; color: #14241c; font-family: inherit; }
+        .fp-app * { box-sizing: border-box; }
+        .fp-side { position: fixed; inset: 0 auto 0 0; width: 248px; background: #fff; border-right: 1px solid #e3ebe6; padding: 22px 14px; display: flex; flex-direction: column; gap: 6px; z-index: 40; transition: transform .25s ease; }
+        .fp-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 18px; font-weight: 800; font-size: 20px; }
+        .fp-logo { width: 34px; height: 34px; border-radius: 10px; background: #1f6b4c; color: #fff; display: grid; place-items: center; font-weight: 800; }
+        .fp-brand span { color: #2f9a6c; }
+        .fp-nav-btn { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: transparent; padding: 11px 12px; border-radius: 12px; font-size: 14px; font-weight: 600; color: #5e7267; cursor: pointer; text-align: left; }
+        .fp-nav-btn:hover { background: #f1f6f3; }
+        .fp-nav-btn.on { background: #e4f1ea; color: #1f6b4c; }
+        .fp-main { margin-left: 248px; min-width: 0; }
+        .fp-top { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e3ebe6; height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 28px; }
+        .fp-burger { display: none; border: 0; background: #f1f6f3; border-radius: 10px; width: 40px; height: 40px; place-items: center; cursor: pointer; color: #1f6b4c; }
+        .fp-crumb { font-size: 14px; color: #6b7f74; }
+        .fp-crumb strong { color: #14241c; }
+        .fp-content { padding: 28px; max-width: 1100px; margin: 0 auto; display: grid; gap: 20px; }
+        .fp-head h1 { margin: 0; font-size: 26px; letter-spacing: -.02em; }
+        .fp-head p { margin: 6px 0 0; color: #6b7f74; font-size: 14px; }
+        .fp-card { background: #fff; border: 1px solid #e6eeea; border-radius: 16px; padding: 18px; box-shadow: 0 1px 2px rgba(20,36,28,.04); }
+        .fp-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+        .fp-card h3 { margin: 0; font-size: 16px; }
+        .fp-wallet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+        .fp-wallets { display: grid; gap: 14px; }
+        .fp-wallet-card { background: #fff; border: 1px solid #e6eeea; border-radius: 16px; padding: 18px; display: grid; gap: 6px; align-content: start; }
+        .fp-wallet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .fp-code { font-weight: 800; font-size: 13px; background: #e4f1ea; color: #1f6b4c; padding: 4px 9px; border-radius: 999px; }
+        .fp-wallet-balance { font-size: 28px; font-weight: 800; letter-spacing: -.02em; margin-top: 8px; font-variant-numeric: tabular-nums; }
+        .fp-wallet-balance small { font-size: 13px; color: #6b7f74; font-weight: 600; }
+        .fp-wallet-meta { font-size: 12px; color: #6b7f74; }
+        .fp-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .fp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: #1f6b4c; color: #fff; border: 0; border-radius: 11px; padding: 11px 16px; font-size: 14px; font-weight: 700; cursor: pointer; min-height: 42px; }
+        .fp-btn:disabled { opacity: .5; cursor: not-allowed; }
+        .fp-btn-ghost { background: #eef4f0; color: #1f6b4c; }
+        .fp-input { width: 100%; padding: 11px 12px; border-radius: 11px; border: 1px solid #dbe5df; font-size: 15px; background: #fff; font-family: inherit; color: inherit; }
+        .fp-label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: #3d5249; }
+        .fp-form { display: grid; gap: 8px; margin-top: 8px; border-top: 1px solid #eef2ef; padding-top: 12px; }
+        .fp-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .fp-span { grid-column: 1 / -1; }
+        .fp-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid #eef2ef; font-size: 14px; }
+        .fp-row > div { display: grid; gap: 2px; min-width: 0; }
+        .fp-plus { color: #1f6b4c; }
+        .fp-small { font-size: 12px; color: #6b7f74; }
+        .fp-muted { color: #6b7f74; font-size: 14px; margin: 0; }
+        .fp-notice { font-size: 14px; color: #1f6b4c; background: #e4f1ea; padding: 10px 12px; border-radius: 10px; margin: 0; }
+        .fp-empty-card { background: #fff; border: 1px dashed #c9d8cf; border-radius: 16px; padding: 18px; }
+        .fp-empty-card p { margin: 6px 0 0; color: #6b7f74; font-size: 14px; }
+        .fp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        .fp-stat strong { display: block; font-size: 22px; margin-top: 6px; }
+        .fp-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .fp-table th, .fp-table td { text-align: left; padding: 12px 8px; border-top: 1px solid #eef2ef; vertical-align: top; }
+        .fp-table th { color: #6b7f74; font-size: 12px; font-weight: 600; }
+        .fp-scroll { overflow-x: auto; }
+        .fp-scrim { display: none; }
+        @media (max-width: 900px) {
+          .fp-side { transform: translateX(-100%); }
+          .fp-side.open { transform: translateX(0); box-shadow: 0 20px 40px rgba(0,0,0,.15); }
+          .fp-scrim.open { display: block; position: fixed; inset: 0; background: rgba(20,36,28,.35); z-index: 35; }
+          .fp-main { margin-left: 0; }
+          .fp-burger { display: grid; }
+          .fp-stats { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 620px) {
+          .fp-top { padding: 0 16px; }
+          .fp-content { padding: 18px 16px 28px; gap: 16px; }
+          .fp-head h1 { font-size: 22px; }
+          .fp-form-grid { grid-template-columns: 1fr; }
+          .fp-wallet-grid { grid-template-columns: 1fr; }
+          .fp-wallet-balance { font-size: 24px; }
+        }
+      `}</style>
 
-      <section className="main-panel">
-        <header className="topbar">
-          <button aria-label="Ouvrir le menu" className="icon-button mobile-menu" onClick={() => setMobileNavOpen(true)}><Menu size={20} /></button>
-          <div className="breadcrumb"><span>FlashPay</span><span className="breadcrumb-slash">/</span><strong>{activeNav}</strong></div>
-          <div className="topbar-actions"><button aria-label="Rechercher" className="icon-button topbar-icon"><Search size={18} /></button><button aria-label="Notifications" className="icon-button topbar-icon notification-button" onClick={() => setNotice("Vous êtes à jour. Aucune nouvelle notification.")}><Bell size={18} /><i /></button><div className="topbar-divider" /><button className="help-button" onClick={() => setNotice("Centre d’aide FlashPay bientôt disponible.")}><CircleHelp size={16} /><span>Aide</span></button><div className="topbar-avatar">F</div></div>
+      <aside className={`fp-side ${menuOpen ? "open" : ""}`}>
+        <div className="fp-brand"><span className="fp-logo">f</span><div>flash<span>pay</span></div></div>
+        {sections.map(({ id, label, icon: Icon }) => (
+          <button key={id} className={`fp-nav-btn ${active === id ? "on" : ""}`} onClick={() => { setActive(id); setMenuOpen(false); }}>
+            <Icon size={18} strokeWidth={1.8} /><span>{label}</span>
+          </button>
+        ))}
+        <div style={{ marginTop: "auto" }} className="fp-small">Compte personnel</div>
+      </aside>
+      <div className={`fp-scrim ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(false)} />
+
+      <div className="fp-main">
+        <header className="fp-top">
+          <button aria-label="Ouvrir le menu" className="fp-burger" onClick={() => setMenuOpen(true)}><Menu size={20} /></button>
+          <div className="fp-crumb">FlashPay / <strong>{current.label}</strong></div>
         </header>
 
-        <div className="content-wrap">
-          <section className="welcome-row"><div className="welcome-copy"><div className="eyebrow"><span className="eyebrow-dot" /> <TodayLabel /></div><h1>Bonjour <span className="wave-mark">✳</span></h1><p>{heading}</p></div>{(activeNav === "Vue d’ensemble" || activeNav === "Liens de paiement") && <button className="primary-button" onClick={() => { setNotice(""); setCollectionOpen(true); }}><Plus size={18} strokeWidth={2.2} /><span>Nouvelle collecte</span></button>}</section>
-          <div className="demo-banner"><span className="demo-pulse" /><strong>Mode démonstration</strong><span>Les paiements affichés sont simulés. Aucun fonds réel ne circule.</span><button aria-label="En savoir plus" onClick={() => setNotice("Le mode réel nécessite vos identifiants API côté serveur et l’accord du prestataire de paiement pour les encaissements destinés à des tiers.")}><CircleHelp size={15} /></button></div>
-          {notice && <div className="notice-bar" role="status"><Check size={16} /><span>{notice}</span><button aria-label="Fermer" onClick={() => setNotice("")}><X size={15} /></button></div>}
-
-          {activeNav === "Vue d’ensemble" ? <div className="dashboard-content"><div style={{ marginBottom: 16 }}><WalletOverview /></div><section className="summary-grid" aria-label="Résumé du compte">
-            <article className="summary-card balance-card"><div className="card-topline"><span>Solde disponible</span><button aria-label="Options du solde"><Ellipsis size={19} /></button></div><div className="balance-amount">0 <span>FCFA</span></div><div className="balance-foot"><span>Aucune opération réelle pour l’instant</span><button aria-label="Voir le solde"><ArrowRight size={16} /></button></div><div className="balance-orbit orbit-one" /><div className="balance-orbit orbit-two" /></article>
-            <article className="summary-card"><div className="card-topline"><span>Encaissé ce mois</span><span className="mini-icon mint-icon"><ArrowDownLeft size={17} /></span></div><div className="summary-amount">0 <span>FCFA</span></div><div className="summary-foot"><span>Aucune opération réelle pour l’instant</span></div><div className="mini-sparkline"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div></article>
-            <article className="summary-card"><div className="card-topline"><span>À verser manuellement</span><span className="mini-icon amber-icon"><Clock3 size={16} /></span></div><div className="summary-amount">0 <span>FCFA</span></div><div className="summary-foot"><span className="pending-label">0 versement</span><span>à traiter</span></div><button className="manual-link" onClick={() => setActiveNav("Bénéficiaires")}>Voir les bénéficiaires <ArrowRight size={14} /></button></article>
+        <main className="fp-content">
+          <section className="fp-head">
+            <h1>{current.id === "overview" ? "Bonjour" : current.label}</h1>
+            <p>{current.id === "overview" ? <><TodayLabel /> · Tes soldes et tes derniers encaissements.</> : null}</p>
           </section>
 
-          <section className="main-grid">
-            <article className="panel activity-panel"><div className="panel-heading"><div><h2>Activité des paiements</h2><p>Suivez les encaissements de votre compte</p></div><button className="select-button">30 derniers jours <ChevronDown size={15} /></button></div><div className="chart-summary"><strong>0 <span>FCFA</span></strong><div><span>Aucune opération réelle pour l’instant</span></div></div>
-              <div className="chart-wrap" style={{ display: "none" }} role="img" aria-label="Graphique disponible après vos premières opérations"><div className="chart-y-labels"><span>3M</span><span>2M</span><span>1M</span><span>0</span></div><div className="chart-area"><div className="chart-gridline line-one" /><div className="chart-gridline line-two" /><div className="chart-gridline line-three" /><div className="chart-gridline line-four" /><svg className="chart-svg" viewBox="0 0 760 170" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#35a977" stopOpacity=".17" /><stop offset="100%" stopColor="#35a977" stopOpacity="0" /></linearGradient></defs><path d="M0 130 C45 124 55 107 108 112 S174 132 218 101 S275 108 326 83 S389 103 436 72 S490 86 542 49 S606 67 653 42 S713 50 760 20 L760 170 L0 170 Z" fill="url(#chartFill)" /><path d="M0 130 C45 124 55 107 108 112 S174 132 218 101 S275 108 326 83 S389 103 436 72 S490 86 542 49 S606 67 653 42 S713 50 760 20" fill="none" stroke="#2e9f71" strokeWidth="3" strokeLinecap="round" /><circle cx="542" cy="49" r="5" fill="#fff" stroke="#2e9f71" strokeWidth="3" /></svg></div><div className="chart-x-labels"><span>Juin</span><span>Juil.</span><span>Août</span><span>Sept.</span><span>Oct.</span><span>Nov.</span></div></div>
-            </article>
-            <article className="panel channel-panel"><div className="panel-heading compact-heading"><div><h2>Moyens de paiement</h2><p>Répartition des encaissements</p></div><button aria-label="Plus d’options"><Ellipsis size={19} /></button></div><div className="donut-zone"><div className="donut-chart"><div className="donut-center"><strong>0</strong><span>FCFA</span></div></div><div className="donut-legend"><div><i className="legend-dot dot-mtn" /><span>MTN Mobile Money</span><strong>—</strong></div><div><i className="legend-dot dot-orange" /><span>Orange Money</span><strong>—</strong></div><div><i className="legend-dot dot-other" /><span>Autres</span><strong>—</strong></div></div></div><div className="channel-note"><Sparkles size={15} /><span>La répartition apparaîtra après vos premières opérations.</span></div></article>
-          </section>
+          {active === "overview" && (
+            <>
+              <WalletOverview />
+              <section className="fp-card">
+                <div className="fp-card-head"><h3>Dernières transactions</h3><button className="fp-btn fp-btn-ghost" onClick={() => setActive("transactions")}>Tout voir</button></div>
+                <TransactionsList />
+              </section>
+            </>
+          )}
 
-          <section className="panel transactions-panel"><div className="panel-heading transaction-heading"><div><h2>Transactions récentes</h2><p>Les dernières opérations sur votre compte</p></div><div className="table-actions"><button className="select-button filter-button"><span>Tout afficher</span><ChevronDown size={15} /></button><button className="export-button" onClick={() => setNotice("L’export sera disponible avec l’historique connecté.")}><Download size={15} /><span>Exporter</span></button></div></div>
-            <div className="table-scroll"><table><thead><tr><th>CLIENT</th><th>RÉFÉRENCE</th><th>MOYEN</th><th>DATE</th><th>STATUT</th><th className="amount-column">MONTANT</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{payments.slice(0, 4).map((payment) => <tr key={payment.reference}><td><div className="customer-cell"><div className={`customer-avatar avatar-${payment.tint}`}>{payment.initials}</div><strong>{payment.customer}</strong></div></td><td className="reference-cell">{payment.reference}</td><td><span className={`method-mark ${payment.method.startsWith("MTN") ? "method-mtn" : "method-orange"}`}>{payment.method.startsWith("MTN") ? "M" : "O"}</span><span className="method-name">{payment.method}</span></td><td className="date-cell">{payment.date}</td><td><span className={`status-pill status-${payment.status === "Réussi" ? "success" : payment.status === "En attente" ? "pending" : "failed"}`}><i />{payment.status}</span></td><td className="amount-cell">{money(payment.amount)} <span>FCFA</span></td><td><button className="row-more" aria-label={`Options ${payment.reference}`}><Ellipsis size={17} /></button></td></tr>)}</tbody></table></div>
-            <button className="view-all-button" onClick={() => setActiveNav("Transactions")}>Voir toutes les transactions <ArrowRight size={15} /></button>
-          </section>
+          {active === "wallet" && <WalletOverview />}
 
-          <footer className="footer-row"><span>© 2026 FlashPay. Votre argent, en mouvement.</span><div><span className="secure-label"><ShieldCheck size={13} /> Connexion sécurisée</span><span className="footer-separator" /><button onClick={() => setNotice("Centre d’aide FlashPay bientôt disponible.")}>Centre d’aide</button><button onClick={() => setNotice("Les conditions seront publiées avant ouverture au public.")}>Confidentialité</button></div></footer></div> : <WorkspacePanel section={activeNav} notify={setNotice} onNewCollection={() => { setNotice(""); setCollectionOpen(true); }} />}
-        </div>
-      </section>
+          {active === "transactions" && (
+            <section className="fp-card">
+              <div className="fp-card-head"><h3>Toutes les transactions</h3><span className="fp-small">Mises à jour à chaque paiement</span></div>
+              <TransactionsList />
+            </section>
+          )}
 
-      {collectionOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCollectionOpen(false); }}><section className="collection-modal" role="dialog" aria-modal="true" aria-labelledby="collection-title"><div className="modal-head"><div><span className="modal-kicker">NOUVEL ENCAISSEMENT</span><h2 id="collection-title">Créer une collecte</h2><p>Envoyez une demande de paiement mobile money.</p></div><button className="icon-button modal-close" aria-label="Fermer" onClick={() => setCollectionOpen(false)}><X size={19} /></button></div>
-        <form onSubmit={createCollection}><label className="field-label" htmlFor="collect-country">Pays d’encaissement</label><select className="text-input country-select" id="collect-country" value={countryCode} onChange={(event) => { setMethodsLoading(true); setMethodsError(""); setAvailableMethods([]); setCountryCode(event.target.value); }}>{countryList.map((country) => <option key={country.code} value={country.code}>{country.name} · {country.currency}</option>)}</select><label className="field-label amount-label" htmlFor="collect-amount">Montant à encaisser</label><div className="amount-input-wrap"><input id="collect-amount" inputMode="numeric" min="1" placeholder="0" required type="number" value={amount} onChange={(event) => setAmount(event.target.value)} /><span>{countryList.find((country) => country.code === countryCode)?.currency}</span></div>
-          <div className="field-row"><div><label className="field-label" htmlFor="collect-customer">Nom du client</label><input className="text-input" id="collect-customer" placeholder="Ex. Aïcha Nguema" value={customer} onChange={(event) => setCustomer(event.target.value)} /></div><div><label className="field-label" htmlFor="collect-phone">Téléphone Mobile Money</label><input className="text-input" id="collect-phone" inputMode="tel" placeholder="6XX XX XX XX" required value={phone} onChange={(event) => setPhone(event.target.value)} /></div></div>
-          <span className="field-label method-field-label">Moyen de paiement</span>{countryCode === "NG" ? <div className="provider-note"><ShieldCheck size={16} /><span>Le paiement au Nigeria continue sur le checkout sécurisé de l’opérateur.</span></div> : methodsLoading ? <div className="provider-note"><span className="loading-dot" /> Chargement des moyens de paiement…</div> : availableMethods.length ? <div className="method-options">{availableMethods.map((item) => <button className={`method-option ${method === item ? "method-option-selected" : ""}`} key={item} onClick={() => setMethod(item)} type="button"><span className={`method-mark ${item === "MTN" ? "method-mtn" : "method-orange"}`}>{item === "MTN" ? "M" : "O"}</span><span>{item === "MTN" ? "MTN Mobile Money" : item === "ORANGE" ? "Orange Money" : item}</span>{method === item && <Check size={16} />}</button>)}</div> : <div className="provider-note"><ShieldCheck size={16} /><span>{methodsError || `Aucun opérateur de démonstration pour ${countryList.find((country) => country.code === countryCode)?.name ?? countryCode}. Pour afficher la RDC et les autres pays, un administrateur doit configurer la clé de paiement et activer les méthodes du compte marchand.`}</span></div>}
-          <div className="fee-preview"><span>Frais estimés</span><strong>2,5 % (payeur) + 6 % (commission)</strong><small>Le payeur paie le montant + 2,5 %. FlashPay prélève 6 % sur le montant demandé. Les frais Swychr sont à la charge du payeur.</small></div>
-          <button className="primary-button modal-submit" disabled={submitting || methodsLoading || (countryCode !== "NG" && !method)} type="submit"><span>{submitting ? "Création…" : "Créer la demande"}</span><ArrowRight size={17} /></button><p className="modal-footnote"><ShieldCheck size={14} /> Vos identifiants API restent côté serveur.</p>
-        </form></section></div>}
-    </main>
+          {active === "links" && (
+            <>
+              <p className="fp-muted">Crée une demande de paiement mobile money. Le client confirme sur son téléphone, sans ouvrir de lien.</p>
+              <CollectionForm countryList={countryList} />
+            </>
+          )}
+
+          {active === "developers" && (
+            <>
+              <ApiKeyManager />
+              <WebhookSettings />
+            </>
+          )}
+
+          {active === "pricing" && (
+            <section className="fp-card fp-scroll">
+              <div className="fp-card-head"><h3>Tes tarifs</h3><span className="fp-small">Appliqués à tous les comptes</span></div>
+              <table className="fp-table">
+                <thead><tr><th>Opération</th><th>Qui paie</th><th>Frais</th></tr></thead>
+                <tbody>
+                  <tr><td>Encaissement client</td><td>Le client : +2,5 %</td><td>Toi : 6 % de commission</td></tr>
+                  <tr><td>Retrait</td><td>Toi</td><td>5 % (0 % en Premium)</td></tr>
+                  <tr><td>Conversion de devise</td><td>Toi</td><td>4,5 % (1 % avec abonnement)</td></tr>
+                  <tr><td>Abonnement Basic</td><td>Toi</td><td>10 000 FCFA / mois</td></tr>
+                  <tr><td>Abonnement Premium</td><td>Toi</td><td>25 000 FCFA / mois</td></tr>
+                </tbody>
+              </table>
+              <p className="fp-small">Retrait minimum : 1 USD converti, affiché dans chaque devise. Les retraits et conversions sont traités manuellement par FlashPay.</p>
+            </section>
+          )}
+
+          {active === "settings" && (
+            <section className="fp-card">
+              <div className="fp-card-head"><h3>Paramètres du compte</h3></div>
+              <p className="fp-muted">Les encaissements réels s’activent après vérification de ton compte. Pour toute question, contacte l’équipe FlashPay.</p>
+            </section>
+          )}
+        </main>
+      </div>
+    </div>
   );
 }
