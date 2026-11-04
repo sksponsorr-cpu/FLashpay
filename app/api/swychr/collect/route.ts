@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 
   if (process.env.SWYCHR_LIVE_PAYMENTS_ENABLED === "true") {
     return NextResponse.json(
-      { message: "Les paiements réels restent bloqués jusqu’à la mise en place de l’enregistrement durable et des validations Swychr." },
+      { message: "Les paiements réels restent bloqués jusqu’à la mise en place de l’enregistrement durable et des validations du prestataire." },
       { status: 503 },
     );
   }
