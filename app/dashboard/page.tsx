@@ -28,6 +28,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { SUPPORTED_COUNTRIES } from "@/lib/countries";
 import ApiKeyManager from "@/components/api-key-manager";
+import WalletOverview from "@/components/wallet-overview";
 
 type Payment = {
   reference: string;
@@ -103,7 +104,7 @@ function WorkspacePanel({ section, notify, onNewCollection }: { section: string;
   if (section === "Développeurs") return <ApiKeyManager />;
 
   if (section === "Portefeuille") {
-    return <section className="workspace-view"><div className="view-intro"><span className="view-icon"><Wallet size={19} /></span><div><h2>Portefeuille</h2><p>Soldes par devise, retraits, conversions et abonnement.</p></div></div><a className="primary-button" href="/wallet">Ouvrir mon portefeuille</a></section>;
+    return <section className="workspace-view"><div className="view-intro"><span className="view-icon"><Wallet size={19} /></span><div><h2>Portefeuille</h2><p>Soldes par devise, retraits, conversions et abonnement.</p></div></div><div style={{ marginTop: 14 }}><WalletOverview /></div></section>;
   }
 
   if (section === "Liens de paiement") {
@@ -258,11 +259,11 @@ export default function Home() {
         </header>
 
         <div className="content-wrap">
-          <section className="welcome-row"><div className="welcome-copy"><div className="eyebrow"><span className="eyebrow-dot" /> <TodayLabel /></div><h1>Bonjour <span className="wave-mark">✳</span></h1><p>{heading}</p></div><button className="primary-button" onClick={() => { setNotice(""); setCollectionOpen(true); }}><Plus size={18} strokeWidth={2.2} /><span>Nouvelle collecte</span></button></section>
+          <section className="welcome-row"><div className="welcome-copy"><div className="eyebrow"><span className="eyebrow-dot" /> <TodayLabel /></div><h1>Bonjour <span className="wave-mark">✳</span></h1><p>{heading}</p></div>{(activeNav === "Vue d’ensemble" || activeNav === "Liens de paiement") && <button className="primary-button" onClick={() => { setNotice(""); setCollectionOpen(true); }}><Plus size={18} strokeWidth={2.2} /><span>Nouvelle collecte</span></button>}</section>
           <div className="demo-banner"><span className="demo-pulse" /><strong>Mode démonstration</strong><span>Les paiements affichés sont simulés. Aucun fonds réel ne circule.</span><button aria-label="En savoir plus" onClick={() => setNotice("Le mode réel nécessite vos identifiants API côté serveur et l’accord du prestataire de paiement pour les encaissements destinés à des tiers.")}><CircleHelp size={15} /></button></div>
           {notice && <div className="notice-bar" role="status"><Check size={16} /><span>{notice}</span><button aria-label="Fermer" onClick={() => setNotice("")}><X size={15} /></button></div>}
 
-          {activeNav === "Vue d’ensemble" ? <div className="dashboard-content"><section className="summary-grid" aria-label="Résumé du compte">
+          {activeNav === "Vue d’ensemble" ? <div className="dashboard-content"><div style={{ marginBottom: 16 }}><WalletOverview /></div><section className="summary-grid" aria-label="Résumé du compte">
             <article className="summary-card balance-card"><div className="card-topline"><span>Solde disponible</span><button aria-label="Options du solde"><Ellipsis size={19} /></button></div><div className="balance-amount">0 <span>FCFA</span></div><div className="balance-foot"><span>Aucune opération réelle pour l’instant</span><button aria-label="Voir le solde"><ArrowRight size={16} /></button></div><div className="balance-orbit orbit-one" /><div className="balance-orbit orbit-two" /></article>
             <article className="summary-card"><div className="card-topline"><span>Encaissé ce mois</span><span className="mini-icon mint-icon"><ArrowDownLeft size={17} /></span></div><div className="summary-amount">0 <span>FCFA</span></div><div className="summary-foot"><span>Aucune opération réelle pour l’instant</span></div><div className="mini-sparkline"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div></article>
             <article className="summary-card"><div className="card-topline"><span>À verser manuellement</span><span className="mini-icon amber-icon"><Clock3 size={16} /></span></div><div className="summary-amount">0 <span>FCFA</span></div><div className="summary-foot"><span className="pending-label">0 versement</span><span>à traiter</span></div><button className="manual-link" onClick={() => setActiveNav("Bénéficiaires")}>Voir les bénéficiaires <ArrowRight size={14} /></button></article>
