@@ -88,7 +88,7 @@ export default function AuthPage({ initialMode = "login" }: { initialMode?: "log
         if (error) throw error;
       }
 
-      router.replace("/dashboard");
+      router.replace("/apps");
       router.refresh();
     } catch (error) {
       setMessageType("error");
