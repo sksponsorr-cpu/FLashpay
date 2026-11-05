@@ -73,28 +73,25 @@ const css = `
   }
 `;
 
-// Lien dynamique : lit la session (cookies). Il est isolé dans Suspense pour ne pas bloquer le pré-rendu.
-async function BackLink() {
-  let href = "/";
+async function getBackHref() {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) href = "/dashboard";
+    return user ? "/dashboard" : "/";
   } catch {
-    href = "/";
+    return "/";
   }
-  return <Link className="fp-docs-back" href={href}>← Retour à FlashPay</Link>;
 }
 
-export default function ApiDocumentationPage() {
+async function ApiDocumentationContent() {
+  const backHref = await getBackHref();
+
   return (
     <main className="fp-docs">
       <style>{css}</style>
       <header className="fp-docs-top">
         <Link className="fp-docs-brand" href="/"><span className="fp-docs-logo">f</span><span>flash<b>pay</b></span></Link>
-        <Suspense fallback={<Link className="fp-docs-back" href="/">← Retour à FlashPay</Link>}>
-          <BackLink />
-        </Suspense>
+        <Link className="fp-docs-back" href={backHref}>← Retour à FlashPay</Link>
       </header>
 
       <div className="fp-docs-layout">
@@ -189,5 +186,14 @@ const result = await response.json();`}</pre></div>
         </article>
       </div>
     </main>
+  );
+}
+
+// La partie qui lit la session est isolée dans Suspense (exigé par cacheComponents).
+export default function ApiDocumentationPage() {
+  return (
+    <Suspense fallback={<div className="fp-docs" />}>
+      <ApiDocumentationContent />
+    </Suspense>
   );
 }
