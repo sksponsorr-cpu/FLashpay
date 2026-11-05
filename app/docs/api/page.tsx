@@ -1,7 +1,6 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-
-export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Documentation API | FlashPay",
@@ -74,25 +73,28 @@ const css = `
   }
 `;
 
-async function getBackHref() {
+// Lien dynamique : lit la session (cookies). Il est isolé dans Suspense pour ne pas bloquer le pré-rendu.
+async function BackLink() {
+  let href = "/";
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    return user ? "/dashboard" : "/";
+    if (user) href = "/dashboard";
   } catch {
-    return "/";
+    href = "/";
   }
+  return <Link className="fp-docs-back" href={href}>← Retour à FlashPay</Link>;
 }
 
-export default async function ApiDocumentationPage() {
-  const backHref = await getBackHref();
-
+export default function ApiDocumentationPage() {
   return (
     <main className="fp-docs">
       <style>{css}</style>
       <header className="fp-docs-top">
         <Link className="fp-docs-brand" href="/"><span className="fp-docs-logo">f</span><span>flash<b>pay</b></span></Link>
-        <Link className="fp-docs-back" href={backHref}>← Retour à FlashPay</Link>
+        <Suspense fallback={<Link className="fp-docs-back" href="/">← Retour à FlashPay</Link>}>
+          <BackLink />
+        </Suspense>
       </header>
 
       <div className="fp-docs-layout">
