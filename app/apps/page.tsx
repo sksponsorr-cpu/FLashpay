@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+
+type App = { id: string; name: string; category: string; website: string | null };
 
 const categories = ["Paiements", "E-commerce", "Logiciel (SaaS)", "Services", "Autre"];
 
@@ -88,20 +92,61 @@ const css = `
 `;
 
 export default function AppsPage() {
-  const [step, setStep] = useState<"create" | "plan">("create");
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [apps, setApps] = useState<App[]>([]);
+  const [step, setStep] = useState<"list" | "create" | "plan">("create");
   const [name, setName] = useState("");
   const [website, setWebsite] = useState("");
   const [category, setCategory] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function createApp(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.replace("/login"); return; }
+      const { data, error: loadError } = await supabase
+        .from("apps")
+        .select("id, name, category, website")
+        .order("created_at", { ascending: true });
+      if (!active) return;
+      if (loadError) setError("Impossible de charger tes applications.");
+      const list = (data ?? []) as App[];
+      setApps(list);
+      setStep(list.length > 0 ? "list" : "create");
+      setLoading(false);
+    })();
+    return () => { active = false; };
+  }, [router]);
+
+  async function createApp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim() || !category) {
       setError("Renseigne le nom et la catégorie de ton application.");
       return;
     }
     setError("");
-    setStep("plan");
+    setBusy(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.replace("/login"); return; }
+      const { data, error: insertError } = await supabase
+        .from("apps")
+        .insert({ owner_id: user.id, name: name.trim(), website: website.trim() || null, category })
+        .select("id, name, category, website")
+        .single();
+      if (insertError) throw insertError;
+      setApps((prev) => [...prev, data as App]);
+      setStep("plan");
+    } catch {
+      setError("La création a échoué. Réessaie dans un instant.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -116,7 +161,26 @@ export default function AppsPage() {
           <i className={step === "plan" ? "on" : ""} />
         </div>
 
-        {step === "create" && (
+        {loading && <p className="ap-sub">Chargement de tes applications…</p>}
+
+        {!loading && step === "list" && (
+          <section className="ap-card">
+            <h1 className="ap-title">Choisis ton application</h1>
+            <p className="ap-sub">Sélectionne l’application à gérer, ou crées-en une nouvelle.</p>
+            <div className="ap-plans">
+              {apps.map((app) => (
+                <button key={app.id} type="button" className="ap-plan" style={{ textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit" }}
+                  onClick={() => router.push(`/dashboard?app=${app.id}`)}>
+                  <div className="ap-plan-head"><h3>{app.name}</h3><span className="ap-badge">{app.category}</span></div>
+                  {app.website && <div className="ap-sub" style={{ margin: "6px 0 0", textAlign: "left" }}>{app.website}</div>}
+                </button>
+              ))}
+            </div>
+            <button className="ap-btn" type="button" onClick={() => { setStep("create"); setError(""); }}>+ Créer une nouvelle application</button>
+          </section>
+        )}
+
+        {!loading && step === "create" && (
           <section className="ap-card">
             <h1 className="ap-title">Crée ta première application</h1>
             <p className="ap-sub">Ton espace est vide pour l’instant. Commence par créer ton application.</p>
@@ -142,7 +206,7 @@ export default function AppsPage() {
 
               {error && <p className="ap-error" role="alert">{error}</p>}
 
-              <button className="ap-btn" type="submit">Créer mon application</button>
+              <button className="ap-btn" type="submit" disabled={busy}>{busy ? "Création…" : "Créer mon application"}</button>
             </form>
           </section>
         )}
