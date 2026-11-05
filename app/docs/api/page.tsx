@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Documentation API | FlashPay",
   description: "Guide d’intégration de l’API FlashPay.",
