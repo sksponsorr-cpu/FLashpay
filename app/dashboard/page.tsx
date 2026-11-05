@@ -1,7 +1,6 @@
-import { Suspense } from "react";
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownLeft, Code2, LayoutDashboard, Link2, Menu, Percent, Settings, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
