@@ -85,8 +85,10 @@ export async function POST(request: Request) {
 
   // Notification au SaaS du développeur, une seule fois, au moment où le paiement devient « réussi ».
   // Un échec d'envoi n'empêche pas de répondre 200 au prestataire.
-  if (data === "SUCCESSFUL") {
-    // Abonnement : plan activé automatiquement. Collecte : portefeuille crédité, net de la commission.
+  // On relance aussi pour ALREADY_PROCESSED : si un envoi précédent a échoué après la mise à jour du statut,
+  // le crédit doit tout de même aboutir. Le crédit est idempotent (référence unique).
+  if (data === "SUCCESSFUL" || data === "ALREADY_PROCESSED") {
+    // Collecte : portefeuille crédité, net de la commission. Abonnement : pas d'activation automatique (à implémenter).
     const { data: purpose, error: settleError } = await admin.rpc("settle_successful_transaction", {
       p_transaction_id: attributes.transaction_id,
     });
