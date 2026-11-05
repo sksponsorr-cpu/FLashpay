@@ -130,7 +130,7 @@ const css = `
   .fp-foot { margin-top: 64px; border-top: 1px solid #f3e3dc; padding: 26px 18px 34px; text-align: center; color: #6b7e73; font-size: 13px; }
   .fp-foot a { margin: 0 10px; color: #33463c; font-weight: 600; }
 
-  .fe-card { display: grid; gap: 16px; margin-top: 26px; padding: 24px; border-radius: 18px; background: #0d1712; color: #fff; animation: fp-up linear both; animation-timeline: view(); animation-range: entry 0% cover 35%; }
+  .fe-card { display: grid; gap: 16px; margin-top: 26px; padding: 24px; border-radius: 18px; background: #0d1712; color: #fff; animation: fp-reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 30%; }
   .fe-head p { margin: 6px 0 0; color: #e7c4b8; font-size: 15px; }
   .fe-tag { font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #ff8a5c; }
   .fe-label { display: grid; gap: 6px; font-size: 13px; color: #e7c4b8; }
@@ -150,12 +150,13 @@ const css = `
   .fe-note { color: #c9a59a; font-size: 12px; line-height: 1.5; }
   @keyframes fp-in { to { opacity: 1; transform: none; } }
   @keyframes fp-up { from { opacity: 0; transform: translateY(36px); filter: blur(6px); } to { opacity: 1; transform: none; filter: blur(0); } }
+  @keyframes fp-reveal { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
   .fp-hero h1, .fp-hero .fp-lead, .fp-hero .fp-hero-cta { animation: fp-up .9s cubic-bezier(.2,.8,.2,1) both; }
   .fp-hero .fp-lead { animation-delay: .12s; }
   .fp-hero .fp-hero-cta { animation-delay: .24s; }
   .fp-stage { animation: fp-up 1.1s .35s cubic-bezier(.2,.8,.2,1) both; }
-  .fp-sec, .fp-final { animation: fp-up linear both; animation-timeline: view(); animation-range: entry 0% cover 28%; }
-  .fp-band { animation: fp-up linear both; animation-timeline: view(); animation-range: entry 0% cover 30%; }
+  .fp-sec, .fp-final { animation: fp-reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 30%; }
+  .fp-band { animation: fp-reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 30%; }
   .fp-item, .fp-price, .fp-step { transition: transform .35s ease, box-shadow .35s ease, border-color .35s ease; }
   .fp-item:hover, .fp-price:hover, .fp-step:hover { transform: translateY(-4px); box-shadow: 0 24px 40px -28px rgba(13,23,18,.45); border-color: #f0cfc2; }
   .fp-faq { display: grid; gap: 10px; max-width: 760px; margin: 0 auto; }
