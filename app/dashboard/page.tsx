@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -26,7 +27,7 @@ const styles = `
 .dashboard{background:radial-gradient(1200px 600px at 10% -10%,#ffe3d9 0%,transparent 60%),#fffaf8}.dash-card,.panel,.new-key-reveal{border-radius:24px;border:1px solid #f3e3dc80;background:#ffffffd9;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 30px #17211b0d;transition:transform .25s ease,box-shadow .25s ease;animation:fadeUp .45s ease both}.dash-card:hover,.panel:hover{transform:translateY(-2px);box-shadow:0 16px 40px #17211b14}.dash-nav,.primary-button,.dash-app-select,.dash-menu,.notice-bar{transition:background .2s ease,color .2s ease,transform .15s ease}.dash-nav:active,.primary-button:active{transform:scale(.97)}.dash-nav.active{background:linear-gradient(90deg,#fff0eb,#ffe6dc);box-shadow:inset 3px 0 0 #d93a1f}.dash-side{background:#ffffffe6;backdrop-filter:blur(16px)}.dash-top{background:#ffffffcc;backdrop-filter:blur(16px)}.dash-brand,.dash-head h1{letter-spacing:-.02em}.dash-head h1{font-weight:800}.primary-button{min-height:44px;border-radius:16px}.dash-app-select,.key-create-form input,.key-create-form select,.test-funds select,.test-funds input{border-radius:14px;min-height:44px}@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@media (prefers-reduced-motion:reduce){.dash-card,.panel,.dash-nav{animation:none;transition:none}}@media (prefers-color-scheme:dark){.dashboard{background:radial-gradient(1200px 600px at 10% -10%,#2a1410 0%,transparent 60%),#0b0f17;color:#eef2f0}.dash-side,.dash-top{background:#111827cc;border-color:#ffffff1a;color:#eef2f0}.dash-card,.panel,.new-key-reveal{background:#111827d9;border-color:#ffffff1a;color:#eef2f0;box-shadow:0 10px 30px #00000052}.dash-nav{color:#aab4ae}.dash-nav:hover,.dash-nav.active{color:#ff8a66}.dash-app-select,.key-create-form input,.key-create-form select,.test-funds select,.test-funds input,.new-key-reveal code{background:#0b0f17;color:#eef2f0;border-color:#ffffff1a}.dash-muted,.dash-top-label{color:#8b9a92}.notice-bar{background:#2a1410;color:#ffb199}.dash-head h1,.panel-heading{color:#f5f7f6}}@media(max-width:850px){.dash-layout{grid-template-columns:1fr}.dash-side{position:fixed;z-index:12;inset:0 auto 0 0;width:min(280px,85vw);transform:translateX(-105%);transition:transform .2s}.dash-side.open{transform:none;box-shadow:0 20px 60px #17211b33}.dash-scrim.open{display:block;position:fixed;inset:0;background:#17211b55;z-index:11}.dash-menu{display:grid;place-items:center}.dash-top{padding:10px 12px;flex-wrap:wrap}.dash-content{padding:18px 14px}.dash-app-select{flex:1;min-width:0}}@media(max-width:390px){.dash-content{padding:14px 11px}.dash-card{padding:14px}.dash-head h1{font-size:23px}}
 `;
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -74,4 +75,13 @@ export default function DashboardPage() {
       </div>
     </div>
   </div></main>;
+}
+
+// useSearchParams doit être lu dans Suspense (exigé par cacheComponents).
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardContent />
+    </Suspense>
+  );
 }
