@@ -4,228 +4,24 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 type Wallet = { currency_code: string; balance: number };
-type Movement = { id: string; currency_code: string; kind: string; amount: number; balance_after: number; created_at: string };
-type Withdrawal = { id: string; currency_code: string; requested_amount: number; payout_amount: number; status: string; created_at: string };
-type Conversion = { id: string; from_currency: string; to_currency: string; amount: number; status: string; received_amount: number | null; created_at: string };
-type Minimum = { currency_code: string; minimum_amount: number };
-type WalletData = {
-  wallets: Wallet[];
-  movements: Movement[];
-  withdrawals: Withdrawal[];
-  conversions: Conversion[];
-  minimums: Minimum[];
-  rates: { from_currency: string; to_currency: string; rate: number }[];
-  plan: string | null;
-  fee: { withdrawal: number; conversion: number };
-};
+type RequestRow = { id: string; currency_code?: string; requested_amount?: number; payout_amount?: number; status: string; from_currency?: string; to_currency?: string; amount?: number };
+type WalletData = { wallets: Wallet[]; withdrawals: RequestRow[]; conversions: RequestRow[]; minimums: { currency_code: string; minimum_amount: number }[]; plan: string | null; fee: { withdrawal: number; conversion: number }; movements: { id: string; kind: string; amount: number; currency_code: string; created_at: string }[] };
+const fmt = (n:number) => new Intl.NumberFormat("fr-FR",{maximumFractionDigits:2}).format(n);
+const css = `
+.wallet-page{min-height:100vh;background:#fffaf8;color:#17211b;padding:28px 16px;font-family:inherit}.wallet-wrap{max-width:980px;margin:auto;display:grid;gap:20px}.wallet-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.wallet-head h1{margin:0;font-size:30px}.wallet-head a{color:#d93a1f;text-decoration:none;font-weight:700}.wallet-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:14px}.wallet-card{background:#fff;border:1px solid #f3e3dc;border-radius:18px;padding:20px}.wallet-card h2{margin:0 0 10px;font-size:19px}.wallet-card p{color:#65736b;line-height:1.6}.wallet-balance{font-size:27px;font-weight:800;color:#d93a1f}.wallet-panel{background:#fff;border:1px solid #f3e3dc;border-radius:18px;padding:20px}.wallet-panel h2{margin:0 0 14px}.wallet-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.wallet-form input,.wallet-form select{min-width:0;width:100%;height:46px;padding:0 12px;border:1px solid #efd9cf;border-radius:11px;background:#fffaf8;font:inherit}.wallet-form button,.wallet-plan button{min-height:44px;padding:0 14px;border:0;border-radius:11px;background:linear-gradient(180deg,#ff6a3d,#e8401f);color:#fff;font-weight:700;cursor:pointer}.wallet-form button{grid-column:1/-1}.wallet-note{padding:12px;border-radius:12px;background:#fff0eb;color:#9b351f}.wallet-list{display:grid;gap:8px}.wallet-row{border-top:1px solid #f3e3dc;padding:12px 0;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.wallet-muted{color:#718078}.wallet-plan{display:grid;gap:10px}.wallet-plan p{margin:0}.wallet-plan h3{margin:0}.wallet-plan input,.wallet-plan select{height:44px;min-width:0;width:100%;padding:0 10px;border:1px solid #efd9cf;border-radius:10px;background:white;font:inherit}@media(max-width:520px){.wallet-page{padding:18px 12px}.wallet-head h1{font-size:25px}.wallet-panel,.wallet-card{padding:16px}.wallet-form{grid-template-columns:1fr}}
+`;
 
-const fmt = (value: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(value);
-const kindLabel: Record<string, string> = {
-  collection: "Encaissement",
-  withdrawal: "Retrait",
-  conversion_in: "Conversion reçue",
-  conversion_out: "Conversion envoyée",
-  adjustment: "Ajustement",
-};
-const statusLabel: Record<string, string> = { pending: "En attente", paid: "Payé", rejected: "Rejeté", done: "Effectuée" };
-
-export default function WalletPage() {
-  const [data, setData] = useState<WalletData | null>(null);
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [withdrawCurrency, setWithdrawCurrency] = useState("");
-  const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [fromCurrency, setFromCurrency] = useState("");
-  const [toCurrency, setToCurrency] = useState("");
-  const [convertAmount, setConvertAmount] = useState("");
-  const [subForm, setSubForm] = useState({ plan: "basic", country: "CM", mobile: "", method: "MTN" });
-  const [subBusy, setSubBusy] = useState(false);
-
-  async function load() {
-    try {
-      const response = await fetch("/api/wallet", { cache: "no-store" });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? "Impossible de charger ton portefeuille.");
-      setData(result);
-      setWithdrawCurrency((current) => current || result.wallets[0]?.currency_code || "");
-      setFromCurrency((current) => current || result.wallets[0]?.currency_code || "");
-      setToCurrency((current) => current || result.wallets.find((w: Wallet) => w.currency_code !== result.wallets[0]?.currency_code)?.currency_code || "USD");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Impossible de charger ton portefeuille.");
-    }
-  }
-
-  useEffect(() => { void load(); }, []);
-
-  async function send(payload: Record<string, unknown>, onDone: () => void) {
-    setBusy(true);
-    setMessage("");
-    try {
-      const response = await fetch("/api/wallet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? "Demande refusée.");
-      setMessage("Demande enregistrée. Elle sera traitée par FlashPay.");
-      onDone();
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Demande refusée.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function submitWithdraw(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void send(
-      { action: "withdraw", currency_code: withdrawCurrency, amount: Number(withdrawAmount) },
-      () => setWithdrawAmount(""),
-    );
-  }
-
-  function submitConvert(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void send(
-      { action: "convert", from_currency: fromCurrency, to_currency: toCurrency, amount: Number(convertAmount) },
-      () => setConvertAmount(""),
-    );
-  }
-
-  async function subscribe(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubBusy(true);
-    setMessage("");
-    try {
-      const response = await fetch("/api/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          plan: subForm.plan,
-          country_code: subForm.country,
-          mobile: subForm.mobile,
-          payment_method: subForm.method,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? "Impossible de lancer le paiement.");
-      // Le client finalise le paiement sur son téléphone. Le plan s'active automatiquement à la confirmation.
-      window.location.href = result.data.payment_link;
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Impossible de lancer le paiement.");
-    } finally {
-      setSubBusy(false);
-    }
-  }
-
-  if (!data) {
-    return <main style={{ padding: 16 }}><p>{message || "Chargement de ton portefeuille…"}</p></main>;
-  }
-
-  const minimumFor = (currency: string) => data.minimums.find((m) => m.currency_code === currency)?.minimum_amount;
-  const hasWallets = data.wallets.length > 0;
-
-  return (
-    <main style={{ maxWidth: 720, margin: "0 auto", padding: 16, display: "grid", gap: 24 }}>
-      <h1>Mon portefeuille</h1>
-      <p>Abonnement : {data.plan ? (data.plan === "premium" ? "Premium" : "Basic") : "aucun"}</p>
-      {message && <p role="status">{message}</p>}
-
-      <section>
-        <h2>Soldes</h2>
-        {!hasWallets && <p>Ton portefeuille apparaîtra ici après ton premier encaissement réussi.</p>}
-        {data.wallets.map((w) => (
-          <p key={w.currency_code}><strong>{fmt(w.balance)} {w.currency_code}</strong></p>
-        ))}
-      </section>
-
-      <section>
-        <h2>Abonnement</h2>
-        <p>Basic : 10 000 FCFA par mois, 1 % sur les encaissements et conversions, retrait à 5 %, plafond de 200 000 FCFA encaissés par mois.</p>
-        <p>Premium : 25 000 FCFA par mois, 1 % sur les encaissements et conversions, retrait gratuit, plafond de 500 000 FCFA par mois (encaissements et retraits).</p>
-        <form onSubmit={subscribe} style={{ display: "grid", gap: 8 }}>
-          <select value={subForm.plan} onChange={(event) => setSubForm({ ...subForm, plan: event.target.value })}>
-            <option value="basic">Basic · 10 000 FCFA / mois</option>
-            <option value="premium">Premium · 25 000 FCFA / mois</option>
-          </select>
-          <select value={subForm.country} onChange={(event) => setSubForm({ ...subForm, country: event.target.value })}>
-            <option value="CM">Cameroun</option>
-            <option value="SN">Sénégal</option>
-            <option value="BF">Burkina Faso</option>
-            <option value="BJ">Bénin</option>
-            <option value="CI">Côte d’Ivoire</option>
-            <option value="TG">Togo</option>
-            <option value="ML">Mali</option>
-            <option value="CG">Congo-Brazzaville</option>
-          </select>
-          <select value={subForm.method} onChange={(event) => setSubForm({ ...subForm, method: event.target.value })}>
-            <option value="MTN">MTN</option>
-            <option value="ORANGE">Orange</option>
-          </select>
-          <input inputMode="tel" placeholder="Numéro mobile money (sans indicatif)" value={subForm.mobile} onChange={(event) => setSubForm({ ...subForm, mobile: event.target.value })} required />
-          <button disabled={subBusy || !subForm.mobile} type="submit">{subBusy ? "Ouverture du paiement…" : "Payer l’abonnement"}</button>
-        </form>
-        <p>Ton plan s’active automatiquement dès que le paiement est confirmé.</p>
-      </section>
-
-      <section>
-        <h2>Retrait</h2>
-        <p>Frais : {data.fee.withdrawal} %. Tu reçois le montant demandé moins ces frais. Le minimum est affiché dans chaque devise.</p>
-        {hasWallets && (
-          <form onSubmit={submitWithdraw} style={{ display: "grid", gap: 8 }}>
-            <select value={withdrawCurrency} onChange={(event) => setWithdrawCurrency(event.target.value)}>
-              {data.wallets.map((w) => <option key={w.currency_code} value={w.currency_code}>{w.currency_code}</option>)}
-            </select>
-            <input
-              inputMode="decimal"
-              placeholder="Montant demandé"
-              value={withdrawAmount}
-              onChange={(event) => setWithdrawAmount(event.target.value)}
-              required
-            />
-            {minimumFor(withdrawCurrency) !== undefined && <p>Minimum : {fmt(minimumFor(withdrawCurrency)!)} {withdrawCurrency}</p>}
-            <button disabled={busy || !withdrawAmount} type="submit">Demander le retrait</button>
-          </form>
-        )}
-      </section>
-
-      <section>
-        <h2>Conversion</h2>
-        <p>Frais : {data.fee.conversion} %. Le taux est appliqué par FlashPay au moment du traitement.</p>
-        {hasWallets && (
-          <form onSubmit={submitConvert} style={{ display: "grid", gap: 8 }}>
-            <select value={fromCurrency} onChange={(event) => setFromCurrency(event.target.value)}>
-              {data.wallets.map((w) => <option key={w.currency_code} value={w.currency_code}>{w.currency_code}</option>)}
-            </select>
-            <input placeholder="Vers (ex. USD)" value={toCurrency} onChange={(event) => setToCurrency(event.target.value.toUpperCase())} required />
-            <input inputMode="decimal" placeholder="Montant à convertir" value={convertAmount} onChange={(event) => setConvertAmount(event.target.value)} required />
-            <button disabled={busy || !convertAmount || !toCurrency} type="submit">Demander la conversion</button>
-          </form>
-        )}
-      </section>
-
-      <section>
-        <h2>Demandes</h2>
-        {data.withdrawals.length === 0 && data.conversions.length === 0 && <p>Aucune demande pour le moment.</p>}
-        {data.withdrawals.map((r) => (
-          <p key={r.id}>Retrait {fmt(r.requested_amount)} {r.currency_code} · reçu {fmt(r.payout_amount)} · {statusLabel[r.status] ?? r.status}</p>
-        ))}
-        {data.conversions.map((r) => (
-          <p key={r.id}>Conversion {fmt(r.amount)} {r.from_currency} → {r.to_currency} · {statusLabel[r.status] ?? r.status}{r.received_amount ? ` · reçu ${fmt(r.received_amount)}` : ""}</p>
-        ))}
-      </section>
-
-      <section>
-        <h2>Mouvements</h2>
-        {data.movements.length === 0 && <p>Aucun mouvement.</p>}
-        {data.movements.map((m) => (
-          <p key={m.id}>
-            {kindLabel[m.kind] ?? m.kind} · {m.amount > 0 ? "+" : ""}{fmt(m.amount)} {m.currency_code} · solde {fmt(m.balance_after)}
-          </p>
-        ))}
-      </section>
-    </main>
-  );
+export default function WalletPage(){
+ const [data,setData]=useState<WalletData|null>(null);const [message,setMessage]=useState("");const [busy,setBusy]=useState(false);const [currency,setCurrency]=useState("");const [amount,setAmount]=useState("");const [sub,setSub]=useState({plan:"basic",country:"CM",mobile:"",method:"MTN"});
+ async function load(){try{const r=await fetch("/api/wallet",{cache:"no-store"});const j=await r.json();if(!r.ok)throw new Error(j.message||"Impossible de charger le portefeuille.");setData(j);setCurrency((c)=>c||j.wallets[0]?.currency_code||"")}catch(e){setMessage(e instanceof Error?e.message:"Erreur de chargement.")}}
+ useEffect(()=>{void load()},[]);
+ async function withdraw(e:FormEvent){e.preventDefault();setBusy(true);setMessage("");try{const r=await fetch("/api/wallet",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"withdraw",currency_code:currency,amount:Number(amount)})});const j=await r.json();if(!r.ok)throw new Error(j.message||"Demande refusée.");setMessage("Demande de retrait enregistrée.");setAmount("");await load()}catch(e){setMessage(e instanceof Error?e.message:"Demande refusée.")}finally{setBusy(false)}}
+ async function subscribe(e:FormEvent){e.preventDefault();setBusy(true);setMessage("");try{const r=await fetch("/api/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan:sub.plan,country_code:sub.country,mobile:sub.mobile,payment_method:sub.method})});const j=await r.json();if(!r.ok)throw new Error(j.message||"Paiement indisponible.");if(j.data?.payment_link)window.location.assign(j.data.payment_link);else setMessage("Le paiement n’a pas retourné de lien.")}catch(e){setMessage(e instanceof Error?e.message:"Paiement indisponible.")}finally{setBusy(false)}}
+ return <main className="wallet-page"><style>{css}</style><div className="wallet-wrap"><header className="wallet-head"><h1>Mon portefeuille</h1><a href="/apps">← Mes applications</a></header>{message&&<div className="wallet-note" role="status">{message}</div>}{!data?<p className="wallet-muted">Chargement…</p>:<>
+ <section><h2>Soldes par devise</h2><div className="wallet-grid">{data.wallets.length?data.wallets.map(w=><article className="wallet-card" key={w.currency_code}><span className="wallet-muted">Portefeuille {w.currency_code}</span><div className="wallet-balance">{fmt(w.balance)} {w.currency_code}</div></article>):<article className="wallet-card">Ton portefeuille apparaîtra après un premier encaissement réussi.</article>}</div></section>
+ <section className="wallet-grid"><article className="wallet-card wallet-plan"><h2>Basic</h2><p>10 000 FCFA / mois</p><p>1 % jusqu’à 200 000 FCFA encaissés par mois, puis 6 %.</p><p>Retrait 5 % · Conversion 1 %.</p></article><article className="wallet-card wallet-plan"><h2>Premium</h2><p>25 000 FCFA / mois</p><p>1 % jusqu’à 500 000 FCFA encaissés par mois, puis 6 %.</p><p>Retrait 0 % · Conversion 1 %.</p></article></section>
+ <section className="wallet-panel"><h2>Gérer l’abonnement</h2><form className="wallet-form wallet-plan" onSubmit={subscribe}><select value={sub.plan} onChange={e=>setSub({...sub,plan:e.target.value})}><option value="basic">Basic · 10 000 FCFA / mois</option><option value="premium">Premium · 25 000 FCFA / mois</option></select><select value={sub.country} onChange={e=>setSub({...sub,country:e.target.value})}><option value="CM">Cameroun</option><option value="SN">Sénégal</option><option value="CI">Côte d’Ivoire</option><option value="BF">Burkina Faso</option><option value="BJ">Bénin</option><option value="TG">Togo</option></select><select value={sub.method} onChange={e=>setSub({...sub,method:e.target.value})}><option value="MTN">MTN</option><option value="ORANGE">Orange</option></select><input inputMode="tel" placeholder="Numéro mobile money" value={sub.mobile} onChange={e=>setSub({...sub,mobile:e.target.value})} required/><button disabled={busy}>{busy?"Chargement…":"Payer l’abonnement"}</button></form><p className="wallet-muted">Les paiements restent désactivés tant que l’interrupteur serveur n’est pas autorisé.</p></section>
+ <section className="wallet-panel"><h2>Demander un retrait</h2>{data.wallets.length===0?<p className="wallet-muted">Aucun solde disponible.</p>:<form className="wallet-form" onSubmit={withdraw}><select value={currency} onChange={e=>setCurrency(e.target.value)}>{data.wallets.map(w=><option key={w.currency_code}>{w.currency_code}</option>)}</select><input inputMode="decimal" placeholder="Montant" value={amount} onChange={e=>setAmount(e.target.value)} required/><button disabled={busy||!amount}>{busy?"Envoi…":"Confirmer la demande"}</button></form>}</section>
+ <section className="wallet-panel"><h2>Demandes récentes</h2><div className="wallet-list">{[...data.withdrawals,...data.conversions].length===0?<p className="wallet-muted">Aucune demande.</p>:[...data.withdrawals,...data.conversions].map(x=><div className="wallet-row" key={x.id}><span>{x.currency_code?`Retrait · ${x.currency_code}`:`Conversion · ${x.from_currency} → ${x.to_currency}`}</span><strong>{x.status}</strong></div>)}</div></section>
+ </>}</div></main>
 }
