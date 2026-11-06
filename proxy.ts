@@ -36,7 +36,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const isPublicRoute = pathname === "/" || pathname === "/login" || pathname === "/signup" || pathname === "/auth/confirm" || pathname.startsWith("/docs");
+  const isPublicRoute = pathname === "/" || pathname === "/login" || pathname === "/signup" || pathname === "/auth/confirm" || pathname.startsWith("/docs") || pathname.startsWith("/pay/");
 
   if (!hasUser && !isPublicRoute) {
     return NextResponse.redirect(new URL("/login", request.url));
