@@ -23,6 +23,15 @@ const css = `
   .fp-docs { min-height:100vh; width:100%; overflow-x:hidden; background:#fffaf8; color:#17211b; font-family:inherit; }
   .fp-docs * { box-sizing:border-box; min-width:0; }
   .fp-docs a { color:inherit; }
+  .fp-docs-group { display:block; margin-top:14px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#8a7c74; }
+  .fp-docs-starts { display:grid; gap:12px; margin:18px 0 8px; }
+  @media (min-width:700px) { .fp-docs-starts { grid-template-columns:repeat(3,1fr); } }
+  .fp-docs-start { display:grid; gap:6px; padding:18px; border-radius:20px; background:#fff; border:1px solid #f3e3dc; text-decoration:none; box-shadow:0 8px 24px #17211b0d; transition:transform .2s ease, box-shadow .2s ease; }
+  .fp-docs-start:hover { transform:translateY(-2px); box-shadow:0 14px 34px #17211b14; }
+  .fp-docs-start strong { font-size:15px; color:#17211b; }
+  .fp-docs-start span:not(.fp-docs-start-ico) { font-size:13px; color:#6b7f74; line-height:1.45; }
+  .fp-docs-start-ico { display:grid; place-items:center; width:38px; height:38px; border-radius:12px; background:#fff0eb; color:#d93a1f; font-size:17px; font-weight:800; }
+
   .fp-docs-top { position:sticky; top:0; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px max(16px,calc((100vw - 1180px)/2)); border-bottom:1px solid #f3e3dc; background:rgba(255,255,255,.96); backdrop-filter:blur(10px); }
   .fp-docs-brand { display:flex; align-items:center; gap:9px; font-size:19px; font-weight:800; text-decoration:none; }
   .fp-docs-logo { display:grid; place-items:center; width:32px; height:32px; border-radius:10px; background:linear-gradient(145deg,#ff6a3d,#e8401f); color:white; }
@@ -97,13 +106,24 @@ async function ApiDocumentationContent() {
       <div className="fp-docs-layout">
         <nav className="fp-docs-nav" aria-label="Sommaire de la documentation">
           <strong>Documentation API</strong>
-          {sections.map((section) => <a key={section.id} href={`#${section.id}`}>{section.label}</a>)}
+          <span className="fp-docs-group">Démarrage</span>
+          {sections.slice(0, 2).map((section) => <a key={section.id} href={`#${section.id}`}>{section.label}</a>)}
+          <span className="fp-docs-group">Intégration</span>
+          {sections.slice(2, 5).map((section) => <a key={section.id} href={`#${section.id}`}>{section.label}</a>)}
+          <span className="fp-docs-group">Référence</span>
+          {sections.slice(5).map((section) => <a key={section.id} href={`#${section.id}`}>{section.label}</a>)}
         </nav>
 
         <article className="fp-docs-content">
           <span className="fp-docs-kicker">API</span>
           <h1>Intègre FlashPay dans ton application.</h1>
           <p>Crée des demandes de paiement mobile money depuis ton serveur et traite les notifications de statut. Garde tes clés secrètes et teste ton intégration avant toute mise en production.</p>
+
+          <div className="fp-docs-starts">
+            <a className="fp-docs-start" href="#cle"><span className="fp-docs-start-ico">⚡</span><strong>Démarrer en 5 minutes</strong><span>Obtiens ta clé de test et lance ton premier encaissement.</span></a>
+            <a className="fp-docs-start" href="#collecte"><span className="fp-docs-start-ico">↗</span><strong>Créer une collecte</strong><span>Envoie une demande de paiement mobile money depuis ton serveur.</span></a>
+            <a className="fp-docs-start" href="#notifications"><span className="fp-docs-start-ico">✓</span><strong>Recevoir les notifications</strong><span>Vérifie la signature et mets à jour tes commandes.</span></a>
+          </div>
 
           <section id="demarrage">
             <h2>Démarrage</h2>
