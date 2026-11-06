@@ -6,6 +6,26 @@ import { createClient } from "@/lib/supabase/client";
 type Link = { label: string; amount: number; currency_code: string; country_name: string; is_active: boolean };
 const fmt = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n);
 
+const payCss = `
+.pay-page{min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:radial-gradient(900px 500px at 10% -10%,#ffe3d9 0%,transparent 60%),#fffaf8;font-family:inherit;color:#17211b}
+.pay-card{width:100%;max-width:420px;background:#fff;border:1px solid #f3e3dc;border-radius:24px;padding:26px 22px;box-shadow:0 20px 50px -24px #17211b40;display:grid;gap:14px}
+.pay-brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800}
+.pay-logo{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:linear-gradient(145deg,#ff6a3d,#e8401f);color:#fff}
+.pay-brand b{color:#e8401f}
+.pay-test{justify-self:start;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:#fff4e0;color:#8a5a00}
+.pay-card h1{margin:0;font-size:24px;letter-spacing:-.02em}
+.pay-amount{font-size:34px;font-weight:800;color:#17211b}
+.pay-amount small{font-size:16px;color:#6b7f74}
+.pay-country,.pay-msg{margin:0;color:#6b7f74;font-size:14px}
+.pay-form{display:grid;gap:12px;margin-top:6px}
+.pay-field{display:grid;gap:6px}
+.pay-field span{font-size:13px;font-weight:700;color:#55566a}
+.pay-input{min-height:46px;padding:0 14px;border:1px solid #efd9cf;border-radius:14px;background:#fffaf8;color:#17211b;font:inherit}
+.pay-btn{min-height:50px;border:0;border-radius:16px;background:#e8401f;color:#fff;font:inherit;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 12px 26px -10px #e8401f99}
+.pay-btn:disabled{opacity:.6}
+.pay-error{margin:0;color:#c8321a;font-size:14px;font-weight:600}
+`;
+
 function PayContent() {
   const params = useParams<{ token: string }>();
   const token = params.token;
@@ -49,6 +69,7 @@ function PayContent() {
 
   return (
     <main className="pay-page">
+      <style>{payCss}</style>
       <div className="pay-card">
         <div className="pay-brand"><span className="pay-logo">f</span><span>flash<b>pay</b></span></div>
         {notFound && <p className="pay-msg">Ce lien de paiement n’existe pas.</p>}
