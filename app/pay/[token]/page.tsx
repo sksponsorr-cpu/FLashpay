@@ -4,16 +4,31 @@ import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Link = { label: string; amount: number; currency_code: string; country_name: string; is_active: boolean };
+
+// Opérateurs proposés selon la devise du lien (à valider avec les opérateurs réellement activés).
+const operatorsByCurrency: Record<string, string[]> = {
+  XAF: ["MTN MoMo", "Orange Money", "Airtel Money"],
+  XOF: ["Orange Money", "MTN MoMo", "Moov Money", "Wave"],
+  CDF: ["Airtel Money", "Orange Money", "M-Pesa", "Africell Money"],
+  KES: ["M-Pesa", "Airtel Money"],
+  RWF: ["MTN MoMo", "Airtel Money"],
+  GHS: ["MTN MoMo", "Vodafone Cash", "AirtelTigo Money"],
+  NGN: ["Carte bancaire"],
+  USD: ["Carte bancaire"],
+};
+
 const fmt = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n);
 
 const payCss = `
-.pay-page{min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:radial-gradient(900px 500px at 10% -10%,#ffe3d9 0%,transparent 60%),#fffaf8;font-family:inherit;color:#17211b}
+:root{color-scheme:light}
+html,body{background:#fffaf8}
+.pay-page{min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:radial-gradient(900px 500px at 10% -10%,#ffe3d9 0%,transparent 60%),#fffaf8;color:#17211b}
 .pay-card{width:100%;max-width:420px;background:#fff;border:1px solid #f3e3dc;border-radius:24px;padding:26px 22px;box-shadow:0 20px 50px -24px #17211b40;display:grid;gap:14px}
 .pay-brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800}
 .pay-logo{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:linear-gradient(145deg,#ff6a3d,#e8401f);color:#fff}
 .pay-brand b{color:#e8401f}
 .pay-test{justify-self:start;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:#fff4e0;color:#8a5a00}
-.pay-card h1{margin:0;font-size:24px;letter-spacing:-.02em}
+.pay-card h1{margin:0;font-size:24px;letter-spacing:-.02em;color:#17211b}
 .pay-amount{font-size:34px;font-weight:800;color:#17211b}
 .pay-amount small{font-size:16px;color:#6b7f74}
 .pay-country,.pay-msg{margin:0;color:#6b7f74;font-size:14px}
@@ -33,6 +48,7 @@ function PayContent() {
   const [notFound, setNotFound] = useState(false);
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
+  const [operator, setOperator] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
@@ -46,20 +62,22 @@ function PayContent() {
     })();
   }, [token]);
 
+  const operators = link ? (operatorsByCurrency[link.currency_code] ?? []) : [];
+
   async function pay(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
       const supabase = createClient();
-      const { error } = await supabase.rpc("pay_payment_link", { p_token: token, p_name: name, p_mobile: mobile });
+      const { error } = await supabase.rpc("pay_payment_link", { p_token: token, p_name: name, p_mobile: mobile, p_operator: operator });
       if (error) throw error;
       setDone(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       setError(
         msg.includes("LINK_INACTIVE") ? "Ce lien n’est plus actif." :
-        msg.includes("PAYER_REQUIRED") ? "Indique ton nom et ton numéro mobile." :
+        msg.includes("PAYER_REQUIRED") ? "Choisis ton opérateur et indique ton nom et ton numéro." :
         "Le paiement n’a pas pu être effectué."
       );
     } finally {
@@ -84,6 +102,12 @@ function PayContent() {
               <p className="pay-msg">Ce lien n’est plus actif.</p>
             ) : (
               <form className="pay-form" onSubmit={pay}>
+                <label className="pay-field"><span>Opérateur</span>
+                  <select className="pay-input" value={operator} onChange={(e) => setOperator(e.target.value)} required>
+                    <option value="">Choisis ton moyen de paiement</option>
+                    {operators.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </label>
                 <label className="pay-field"><span>Nom</span>
                   <input className="pay-input" value={name} onChange={(e) => setName(e.target.value)} required />
                 </label>
@@ -91,7 +115,7 @@ function PayContent() {
                   <input className="pay-input" inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} required />
                 </label>
                 {error && <p className="pay-error">{error}</p>}
-                <button className="pay-btn" disabled={busy}>{busy ? "Paiement…" : `Payer ${fmt(link.amount)} ${link.currency_code}`}</button>
+                <button className="pay-btn" disabled={busy || !operator}>{busy ? "Paiement…" : `Payer ${fmt(link.amount)} ${link.currency_code}`}</button>
               </form>
             )}
           </>
@@ -107,7 +131,6 @@ function PayContent() {
   );
 }
 
-// useParams doit être lu dans Suspense (exigé par cacheComponents).
 export default function PayPage() {
   return (
     <Suspense fallback={<main className="pay-page" />}>
