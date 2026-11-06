@@ -1,85 +1,90 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { Rocket, KeyRound, Bell, ShieldCheck, Globe, Percent, AlertTriangle, Search, Menu, Zap, PlusCircle, LayoutDashboard, Code2, ChevronDown } from "lucide-react";
 
 export const metadata = {
   title: "Documentation API | FlashPay",
   description: "Guide d’intégration de l’API FlashPay.",
 };
 
-const sections = [
-  { id: "demarrage", label: "Démarrage" },
-  { id: "cle", label: "Obtenir une clé" },
-  { id: "auth", label: "Authentification" },
-  { id: "collecte", label: "Créer une collecte" },
-  { id: "notifications", label: "Notifications" },
-  { id: "erreurs", label: "Codes d’erreur" },
-  { id: "pays", label: "Pays et devises" },
-  { id: "frais", label: "Frais" },
-  { id: "production", label: "Passer en production" },
+const groups = [
+  { label: "Démarrage", items: [
+    { id: "demarrage", label: "Démarrer", icon: Rocket },
+    { id: "cle", label: "Obtenir une clé", icon: KeyRound },
+    { id: "auth", label: "Authentification", icon: ShieldCheck },
+  ] },
+  { label: "Intégration", items: [
+    { id: "collecte", label: "Créer une collecte", icon: PlusCircle },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "pays", label: "Pays et devises", icon: Globe },
+    { id: "frais", label: "Frais", icon: Percent },
+  ] },
+  { label: "Référence", items: [
+    { id: "erreurs", label: "Codes d’erreur", icon: AlertTriangle },
+    { id: "production", label: "Passer en production", icon: ShieldCheck },
+  ] },
 ];
 
 const css = `
-  .fp-docs { min-height:100vh; width:100%; overflow-x:hidden; background:#fffaf8; color:#17211b; font-family:inherit; }
-  .fp-docs * { box-sizing:border-box; min-width:0; }
-  .fp-docs a { color:inherit; }
-  .fp-docs-group { display:block; margin-top:14px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#8a7c74; }
-  .fp-docs-starts { display:grid; gap:12px; margin:18px 0 8px; }
-  @media (min-width:700px) { .fp-docs-starts { grid-template-columns:repeat(3,1fr); } }
-  .fp-docs-start { display:grid; gap:6px; padding:18px; border-radius:20px; background:#fff; border:1px solid #f3e3dc; text-decoration:none; box-shadow:0 8px 24px #17211b0d; transition:transform .2s ease, box-shadow .2s ease; }
-  .fp-docs-start:hover { transform:translateY(-2px); box-shadow:0 14px 34px #17211b14; }
-  .fp-docs-start strong { font-size:15px; color:#17211b; }
-  .fp-docs-start span:not(.fp-docs-start-ico) { font-size:13px; color:#6b7f74; line-height:1.45; }
-  .fp-docs-start-ico { display:grid; place-items:center; width:38px; height:38px; border-radius:12px; background:#fff0eb; color:#d93a1f; font-size:17px; font-weight:800; }
-
-  .fp-docs-top { position:sticky; top:0; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px max(16px,calc((100vw - 1180px)/2)); border-bottom:1px solid #f3e3dc; background:rgba(255,255,255,.96); backdrop-filter:blur(10px); }
-  .fp-docs-brand { display:flex; align-items:center; gap:9px; font-size:19px; font-weight:800; text-decoration:none; }
-  .fp-docs-logo { display:grid; place-items:center; width:32px; height:32px; border-radius:10px; background:linear-gradient(145deg,#ff6a3d,#e8401f); color:white; }
-  .fp-docs-brand b { color:#e8401f; }
-  .fp-docs-back { color:#d93a1f!important; font-size:14px; font-weight:700; text-decoration:none; overflow-wrap:anywhere; }
-  .fp-docs-layout { display:grid; grid-template-columns:230px minmax(0,1fr); gap:40px; width:min(1180px,100%); margin:0 auto; padding:32px 20px 72px; }
-  .fp-docs-nav { position:sticky; top:88px; align-self:start; display:grid; gap:5px; }
-  .fp-docs-nav strong { margin:0 0 7px; color:#d93a1f; font-size:12px; letter-spacing:.12em; text-transform:uppercase; }
-  .fp-docs-nav a { padding:9px 11px; border-radius:10px; color:#526158; font-size:14px; text-decoration:none; overflow-wrap:anywhere; }
-  .fp-docs-nav a:hover { background:#fff0eb; color:#d93a1f; }
-  .fp-docs-content { width:100%; max-width:860px; overflow-wrap:anywhere; word-break:normal; }
-  .fp-docs-kicker { color:#d93a1f; font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
-  .fp-docs h1 { max-width:100%; margin:10px 0 14px; font-size:clamp(30px,5vw,48px); line-height:1.08; letter-spacing:-.03em; overflow-wrap:anywhere; }
-  .fp-docs h2 { margin:0 0 12px; font-size:25px; letter-spacing:-.02em; }
-  .fp-docs h3 { margin:22px 0 8px; font-size:17px; }
-  .fp-docs p,.fp-docs li { max-width:100%; color:#526158; font-size:15px; line-height:1.7; overflow-wrap:anywhere; }
-  .fp-docs section { padding-top:38px; scroll-margin-top:85px; }
-  .fp-docs ul,.fp-docs ol { padding-left:22px; }
-  .fp-docs-card { margin:14px 0; padding:16px; border:1px solid #f3e3dc; border-radius:16px; background:#fff; }
-  .fp-docs-note { margin:14px 0; padding:15px 16px; border:1px solid #f3e3dc; border-radius:14px; background:#fff0eb; color:#563a30; line-height:1.65; overflow-wrap:anywhere; }
-  .fp-docs-note strong { color:#c83c20; }
-  .fp-docs-code { max-width:100%; margin:14px 0; overflow-x:hidden; border:1px solid #38231d; border-radius:14px; background:#15110f; color:#fff1eb; }
-  .fp-docs-code-head { padding:9px 14px; border-bottom:1px solid #38231d; color:#ffd0c0; font-size:12px; }
-  .fp-docs-code pre { max-width:100%; margin:0; padding:14px; overflow-x:auto; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace; }
-  .fp-docs-inline { padding:2px 6px; border-radius:6px; background:#fff0eb; color:#b63820; font-size:.92em; overflow-wrap:anywhere; word-break:break-word; }
-  .fp-docs-table-wrap { width:100%; max-width:100%; overflow-x:auto; border:1px solid #f3e3dc; border-radius:12px; background:#fff; }
-  .fp-docs table { width:100%; border-collapse:collapse; font-size:14px; }
-  .fp-docs th,.fp-docs td { padding:10px 12px; border-bottom:1px solid #f3e3dc; text-align:left; vertical-align:top; overflow-wrap:anywhere; }
-  .fp-docs th { color:#d93a1f; font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
-  .fp-docs tr:last-child td { border-bottom:0; }
-  .fp-docs-footer { margin-top:48px; padding-top:18px; border-top:1px solid #f3e3dc; color:#718078!important; font-size:13px!important; }
-  @media(max-width:760px) {
-    .fp-docs-top { padding:11px 14px; }
-    .fp-docs-layout { grid-template-columns:minmax(0,1fr); gap:18px; padding:20px 14px 48px; }
-    .fp-docs-nav { position:static; display:grid; grid-template-columns:minmax(0,1fr); gap:2px; padding:12px; border:1px solid #f3e3dc; border-radius:14px; background:#fff; }
-    .fp-docs-nav strong { margin-bottom:5px; }
-    .fp-docs-nav a { padding:8px 9px; }
-    .fp-docs h2 { font-size:22px; }
-    .fp-docs section { padding-top:30px; scroll-margin-top:76px; }
-  }
-  @media(max-width:420px) {
-    .fp-docs-layout { padding-right:12px; padding-left:12px; }
-    .fp-docs-top { gap:8px; }
-    .fp-docs-back { max-width:52%; text-align:right; }
-    .fp-docs-card,.fp-docs-note { padding:13px; }
-    .fp-docs-code pre { padding:12px; font-size:12px; }
-    .fp-docs th,.fp-docs td { padding:8px; }
-  }
+.fp-docs{min-height:100vh;background:#0d0e13;color:#d3d4dc;font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:dark}
+.fp-docs *{box-sizing:border-box}
+.fp-docs a{color:inherit;text-decoration:none}
+.fp-docs-top{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid #1f2028;position:sticky;top:0;background:#0d0e13;z-index:5}
+.fp-docs-brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;color:#f2f2f7}
+.fp-docs-brand b{color:#ff6a3d}
+.fp-docs-logo{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:linear-gradient(145deg,#ff6a3d,#e8401f);color:#fff;font-weight:800}
+.fp-docs-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;color:#9ea0b2;border:1px solid #24252f;margin-left:auto}
+.fp-docs-back{font-size:13px;color:#ff6a3d;font-weight:700}
+.fp-docs-crumb{padding:12px 18px;border-bottom:1px solid #1f2028;font-size:14px;color:#8b8da0;display:flex;gap:8px;align-items:center}
+.fp-docs-crumb strong{color:#f2f2f7}
+.fp-docs-layout{display:grid;grid-template-columns:1fr;gap:0;max-width:1200px;margin:0 auto}
+@media(min-width:900px){.fp-docs-layout{grid-template-columns:270px 1fr}}
+.fp-docs-nav{padding:18px 16px;border-bottom:1px solid #1f2028}
+@media(min-width:900px){.fp-docs-nav{border-bottom:0;border-right:1px solid #1f2028;position:sticky;top:0;align-self:start;height:100vh;overflow:auto}}
+.fp-docs-nav details{}
+.fp-docs-nav summary{list-style:none;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid #24252f;border-radius:14px;font-weight:700;color:#e7e7ee;cursor:pointer}
+.fp-docs-nav summary::-webkit-details-marker{display:none}
+@media(min-width:900px){.fp-docs-nav summary{display:none}.fp-docs-nav details{display:block}}
+.fp-docs-nav details[open] .fp-docs-menu{display:block}
+.fp-docs-menu{display:none;margin-top:10px}
+@media(min-width:900px){.fp-docs-menu{display:block;margin-top:0}}
+.fp-docs-group{display:block;margin:18px 10px 8px;font-size:14px;font-weight:700;color:#e7e7ee}
+.fp-docs-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;color:#9ea0b2;font-size:15px;line-height:1.3}
+.fp-docs-item:hover{background:#17181f;color:#fff}
+.fp-docs-item.on{background:#2a1812;color:#ff8a66}
+.fp-docs-item svg{flex:none;opacity:.85}
+.fp-docs-content{padding:22px 18px 60px;min-width:0}
+@media(min-width:900px){.fp-docs-content{padding:34px 40px 80px}}
+.fp-docs-kicker{display:block;font-size:13px;font-weight:800;color:#ff6a3d;margin-top:10px;letter-spacing:.02em}
+.fp-docs-content h1{font-size:34px;line-height:1.15;letter-spacing:-.02em;color:#f2f2f7;margin:6px 0 12px;font-weight:800}
+@media(min-width:900px){.fp-docs-content h1{font-size:40px}}
+.fp-docs-content h2{font-size:24px;color:#f2f2f7;margin:44px 0 12px;font-weight:800}
+.fp-docs-content h3{font-size:18px;color:#f2f2f7;margin:26px 0 8px;font-weight:700}
+.fp-docs-content p,.fp-docs-content li{font-size:16px;line-height:1.7;color:#b8bac7}
+.fp-docs-lead{font-size:17px;max-width:720px}
+.fp-docs-starts{display:grid;gap:14px;margin:26px 0 10px}
+@media(min-width:700px){.fp-docs-starts{grid-template-columns:repeat(3,1fr)}}
+.fp-docs-start{display:grid;gap:8px;padding:20px;border-radius:20px;background:#14151c;border:1px solid #24252f;transition:transform .2s ease,border-color .2s ease}
+.fp-docs-start:hover{transform:translateY(-2px);border-color:#3a3c4a}
+.fp-docs-start strong{font-size:17px;color:#f2f2f7}
+.fp-docs-start span.t{font-size:14px;color:#9ea0b2;line-height:1.5}
+.fp-docs-start-ico{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:#2a1812;color:#ff6a3d}
+.fp-docs-card,.fp-docs-note{padding:16px 18px;border-radius:16px;background:#14151c;border:1px solid #24252f;margin:14px 0;color:#d3d4dc;font-size:15px;line-height:1.65}
+.fp-docs-note strong{color:#ffb199}
+.fp-docs-card ol{margin:0;padding-left:20px}
+.fp-docs-code{border-radius:16px;overflow:hidden;border:1px solid #24252f;margin:14px 0;background:#0a0b0f}
+.fp-docs-code-head{padding:9px 14px;font-size:12px;color:#8b8da0;border-bottom:1px solid #1f2028;background:#101117}
+.fp-docs-code pre{margin:0;padding:16px;overflow:auto;font-size:14px;line-height:1.6;color:#e7e7ee;font-family:"Roboto Mono",ui-monospace,Menlo,Consolas,monospace}
+code.fp-docs-inline{background:#1d1f29;color:#ffb199;padding:2px 7px;border-radius:7px;font-size:14px}
+.fp-docs-table-wrap{overflow-x:auto;border:1px solid #24252f;border-radius:16px;margin:14px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:12px 14px;text-align:left;border-bottom:1px solid #1f2028;vertical-align:top}
+th{color:#f2f2f7;background:#101117;font-weight:700}
+td{color:#b8bac7}
+td code{background:#1d1f29;color:#ffb199;padding:1px 6px;border-radius:6px}
+.fp-docs-footer{margin-top:56px;color:#6f7285;font-size:13px}
+section{scroll-margin-top:80px}
 `;
 
 async function getBackHref() {
@@ -94,35 +99,44 @@ async function getBackHref() {
 
 async function ApiDocumentationContent() {
   const backHref = await getBackHref();
-
   return (
     <main className="fp-docs">
       <style>{css}</style>
+
       <header className="fp-docs-top">
         <Link className="fp-docs-brand" href="/"><span className="fp-docs-logo">f</span><span>flash<b>pay</b></span></Link>
+        <span className="fp-docs-icon" aria-hidden="true"><Search size={18} /></span>
         <Link className="fp-docs-back" href={backHref}>← Retour à FlashPay</Link>
       </header>
 
+      <div className="fp-docs-crumb"><span>Démarrage</span><span>›</span><strong>FlashPay</strong></div>
+
       <div className="fp-docs-layout">
         <nav className="fp-docs-nav" aria-label="Sommaire de la documentation">
-          <strong>Documentation API</strong>
-          <span className="fp-docs-group">Démarrage</span>
-          {sections.slice(0, 2).map((section) => <a key={section.id} href={`#${section.id}`}>{section.label}</a>)}
-          <span className="fp-docs-group">Intégration</span>
-          {sections.slice(2, 5).map((section) => <a key={section.id} href={`#${section.id}`}>{section.label}</a>)}
-          <span className="fp-docs-group">Référence</span>
-          {sections.slice(5).map((section) => <a key={section.id} href={`#${section.id}`}>{section.label}</a>)}
+          <details>
+            <summary><span>Documentation</span><ChevronDown size={18} /></summary>
+            <div className="fp-docs-menu">
+              {groups.map((g) => (
+                <div key={g.label}>
+                  <span className="fp-docs-group">{g.label}</span>
+                  {g.items.map((it) => { const Icon = it.icon; return (
+                    <a key={it.id} className="fp-docs-item" href={`#${it.id}`}><Icon size={18} />{it.label}</a>
+                  ); })}
+                </div>
+              ))}
+            </div>
+          </details>
         </nav>
 
         <article className="fp-docs-content">
-          <span className="fp-docs-kicker">API</span>
+          <span className="fp-docs-kicker">API · Version test</span>
           <h1>Intègre FlashPay dans ton application.</h1>
-          <p>Crée des demandes de paiement mobile money depuis ton serveur et traite les notifications de statut. Garde tes clés secrètes et teste ton intégration avant toute mise en production.</p>
+          <p className="fp-docs-lead">Crée des demandes de paiement mobile money depuis ton serveur et traite les notifications de statut. Garde tes clés secrètes et teste ton intégration avant toute mise en production.</p>
 
           <div className="fp-docs-starts">
-            <a className="fp-docs-start" href="#cle"><span className="fp-docs-start-ico">⚡</span><strong>Démarrer en 5 minutes</strong><span>Obtiens ta clé de test et lance ton premier encaissement.</span></a>
-            <a className="fp-docs-start" href="#collecte"><span className="fp-docs-start-ico">↗</span><strong>Créer une collecte</strong><span>Envoie une demande de paiement mobile money depuis ton serveur.</span></a>
-            <a className="fp-docs-start" href="#notifications"><span className="fp-docs-start-ico">✓</span><strong>Recevoir les notifications</strong><span>Vérifie la signature et mets à jour tes commandes.</span></a>
+            <a className="fp-docs-start" href="#cle"><span className="fp-docs-start-ico"><Zap size={22} /></span><strong>Démarrer en 5 minutes</strong><span className="t">Obtiens ta clé de test et lance ton premier encaissement.</span></a>
+            <a className="fp-docs-start" href="#collecte"><span className="fp-docs-start-ico"><Rocket size={22} /></span><strong>Créer une collecte</strong><span className="t">Envoie une demande de paiement mobile money depuis ton serveur.</span></a>
+            <a className="fp-docs-start" href="#notifications"><span className="fp-docs-start-ico"><Bell size={22} /></span><strong>Recevoir les notifications</strong><span className="t">Vérifie la signature et mets à jour tes commandes.</span></a>
           </div>
 
           <section id="demarrage">
@@ -176,6 +190,16 @@ const result = await response.json();`}</pre></div>
             <div className="fp-docs-note"><strong>Important.</strong> Ne traite une notification qu’après validation de sa signature et du statut de la transaction.</div>
           </section>
 
+          <section id="pays">
+            <h2>Pays et devises</h2>
+            <p>Les pays et moyens de paiement disponibles sont ceux configurés dans FlashPay au moment de la demande. Utilise le code pays attendu par l’API.</p>
+          </section>
+
+          <section id="frais">
+            <h2>Frais</h2>
+            <div className="fp-docs-note">Le payeur règle <strong>2,5 %</strong> en plus du montant demandé. Sans abonnement, la commission est de <strong>6 %</strong>. Basic applique 1 % jusqu’à 200 000 FCFA encaissés par mois, puis 6 %. Premium applique 1 % jusqu’à 500 000 FCFA encaissés par mois, puis 6 %.</div>
+          </section>
+
           <section id="erreurs">
             <h2>Codes d’erreur</h2>
             <div className="fp-docs-table-wrap"><table><thead><tr><th>Code</th><th>Signification</th><th>Action</th></tr></thead><tbody>
@@ -185,16 +209,6 @@ const result = await response.json();`}</pre></div>
               <tr><td>429</td><td>Limite de requêtes dépassée</td><td>Attends avant de réessayer.</td></tr>
               <tr><td>503</td><td>Service indisponible</td><td>Réessaie plus tard ou contacte le support.</td></tr>
             </tbody></table></div>
-          </section>
-
-          <section id="pays">
-            <h2>Pays et devises</h2>
-            <p>Les pays et moyens de paiement disponibles sont ceux configurés dans FlashPay au moment de la demande. Utilise le code pays attendu par l’API.</p>
-          </section>
-
-          <section id="frais">
-            <h2>Frais</h2>
-            <div className="fp-docs-note">Le payeur règle <strong>2,5 %</strong> en plus du montant demandé. Sans abonnement, la commission est de <strong>6 %</strong>. Basic applique 1 % jusqu’à 200 000 FCFA encaissés par mois, puis 6 %. Premium applique 1 % jusqu’à 500 000 FCFA encaissés par mois, puis 6 %.</div>
           </section>
 
           <section id="production">
