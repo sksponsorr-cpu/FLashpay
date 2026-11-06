@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Link = { label: string; amount: number; currency_code: string; country_name: string; is_active: boolean };
 const fmt = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n);
 
-export default function PayPage() {
+function PayContent() {
   const params = useParams<{ token: string }>();
   const token = params.token;
   const [link, setLink] = useState<Link | null>(null);
@@ -83,5 +83,14 @@ export default function PayPage() {
         )}
       </div>
     </main>
+  );
+}
+
+// useParams doit être lu dans Suspense (exigé par cacheComponents).
+export default function PayPage() {
+  return (
+    <Suspense fallback={<main className="pay-page" />}>
+      <PayContent />
+    </Suspense>
   );
 }
