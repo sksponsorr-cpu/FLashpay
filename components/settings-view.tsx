@@ -67,7 +67,6 @@ export default function SettingsView({ appId }: { appId: string }) {
 
   return (
     <section className="set-wrap">
-      <div className="view-intro"><div><h2>Paramètres</h2><p className="dash-muted">Ton application, ta vérification et ta sécurité.</p></div></div>
 
       <div className="dev-tabs" role="tablist">
         <button role="tab" aria-selected={tab === "app"} className={tab === "app" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("app")}>Application</button>
