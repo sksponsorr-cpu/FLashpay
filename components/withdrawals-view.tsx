@@ -29,12 +29,6 @@ export default function WithdrawalsView({ appId, onNew }: { appId: string; onNew
 
   return (
     <section className="wd-wrap">
-      <div className="view-intro">
-        <div>
-          <h2>Retraits</h2>
-          <p className="dash-muted">Retire le solde de cette application vers un compte mobile money ou bancaire.</p>
-        </div>
-      </div>
 
       <div className="dev-tabs" role="tablist">
         <button role="tab" aria-selected={tab === "list"} className={tab === "list" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("list")}>Retraits</button>
