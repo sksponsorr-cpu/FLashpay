@@ -26,7 +26,7 @@ const dateFmt = (v: string) =>
 
 type Action = { currency: string; mode: "withdraw" | "convert" } | null;
 
-export default function WalletOverview({ appId }: { appId: string }) {
+export default function WalletOverview({ appId, onSubmitted }: { appId: string; onSubmitted?: (mode: "withdraw" | "convert") => void }) {
   const [data, setData] = useState<WalletData | null>(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState<Action>(null);
@@ -76,10 +76,12 @@ export default function WalletOverview({ appId }: { appId: string }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Demande refusée.");
+      const mode = open.mode;
       setOpen(null);
       setAmount("");
       setNotice("Demande enregistrée. FlashPay la traite manuellement.");
       await load();
+      onSubmitted?.(mode);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Demande refusée.");
     } finally {
