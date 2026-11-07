@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 }
 
 type WalletAction =
-  | { action: "withdraw"; currency_code: string; amount: number; app_id: string }
+  | { action: "withdraw"; currency_code: string; amount: number; app_id: string; destination?: { country_code?: string; operator?: string; mobile?: string; name?: string } }
   | { action: "convert"; from_currency: string; to_currency: string; amount: number; app_id: string };
 
 export async function POST(request: Request) {
