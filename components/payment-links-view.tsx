@@ -22,6 +22,8 @@ export default function PaymentLinksView({ appId }: { appId: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState("");
+  const [verified, setVerified] = useState(false);
+  const [live, setLive] = useState(false);
 
   async function loadLinks() {
     const supabase = createClient();
@@ -40,6 +42,9 @@ export default function PaymentLinksView({ appId }: { appId: string }) {
       if (data) setCountries(data as Country[]);
     });
     void loadLinks();
+    supabase.from("profiles").select("verification_status").single().then(({ data }) => {
+      setVerified(data?.verification_status === "verified");
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appId]);
 
@@ -64,12 +69,12 @@ export default function PaymentLinksView({ appId }: { appId: string }) {
         currency_code: chosen.currency_code,
         country_code: chosen.code,
         token: makeToken(),
-        mode: "test",
+        mode: verified && live ? "live" : "test",
       });
       if (error) throw error;
       setLabel("");
       setAmount("");
-      setMessage("Lien créé. Il est en mode test : aucun paiement réel.");
+      setMessage(verified && live ? "Lien réel créé. Les paiements passent par le prestataire." : "Lien créé en mode test : aucun paiement réel.");
       await loadLinks();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Impossible de créer le lien.");
@@ -112,6 +117,11 @@ export default function PaymentLinksView({ appId }: { appId: string }) {
             </select>
           </label>
         </div>
+        {verified ? (
+          <label className="pl-field"><span><input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} /> Lien réel (paiements live)</span></label>
+        ) : (
+          <p className="dash-muted">Tant que ton identité n’est pas vérifiée, les liens sont en mode test.</p>
+        )}
         <button className="primary-button" disabled={busy} onClick={() => void create()}>{busy ? "Création…" : "Créer le lien"}</button>
         {message && <p className="dash-muted" role="status">{message}</p>}
       </div>
