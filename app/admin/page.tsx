@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-type Withdrawal = { id: string; currency_code: string; requested_amount: number; payout_amount: number; fee_amount: number; destination_details: unknown; created_at: string };
-type Conversion = { id: string; from_currency: string; to_currency: string; amount: number; created_at: string };
+type Withdrawal = { id: string; currency_code: string; requested_amount: number; payout_amount: number; fee_amount: number; destination_details?: unknown; destination_name?: string | null; destination_country?: string | null; destination_operator?: string | null; destination_mobile?: string | null; created_at: string };
+type Conversion = { id: string; from_currency: string; to_currency: string; amount: number; fee_rate?: number; created_at: string };
 type Rate = { from_currency: string; to_currency: string; rate: number };
 type Minimum = { currency_code: string; minimum_amount: number };
 type Account = { id: string; email: string };
@@ -160,7 +160,11 @@ export default function AdminPage() {
             <div className="adm-card" key={w.id}>
               <h2>{fmt(w.payout_amount)} {w.currency_code} à verser</h2>
               <div className="adm-list"><span>Demandé : {fmt(w.requested_amount)} {w.currency_code} · frais : {fmt(w.fee_amount)}</span><span>{dateFmt(w.created_at)}</span></div>
-              <span className="adm-meta">Destination : {JSON.stringify(w.destination_details ?? {})}</span>
+              <div className="adm-list">
+                <span>Bénéficiaire : <strong>{w.destination_name ?? "non renseigné"}</strong></span>
+                <span>Téléphone : <strong>{w.destination_mobile ?? "non renseigné"}</strong></span>
+                <span>Pays : {w.destination_country ?? "—"} · Opérateur : {w.destination_operator ?? "—"}</span>
+              </div>
               <div className="adm-row">
                 <button className="adm-btn" disabled={busy} onClick={() => act({ action: "mark_withdrawal_paid", id: w.id }, "Retrait marqué comme payé.")}>Marquer payé</button>
                 <button className="adm-btn g" disabled={busy} onClick={() => act({ action: "reject_withdrawal", id: w.id }, "Retrait rejeté.")}>Rejeter</button>
@@ -179,6 +183,20 @@ export default function AdminPage() {
               <h2>{fmt(c.amount)} {c.from_currency} → {c.to_currency}</h2>
               <span className="adm-meta">{dateFmt(c.created_at)}</span>
               <input className="adm-in" inputMode="decimal" placeholder="Taux appliqué" value={convRate[c.id] ?? ""} onChange={(e) => setConvRate({ ...convRate, [c.id]: e.target.value })} />
+              {(() => {
+                const rate = Number(convRate[c.id]);
+                const fee = Number(c.fee_rate ?? 0);
+                const benefit = rate > 0 ? c.amount * rate * (fee / 100) : null;
+                const payout = rate > 0 ? c.amount * rate * (1 - fee / 100) : null;
+                return (
+                  <div className="adm-list">
+                    <span>Frais de conversion : {fee} %</span>
+                    {payout !== null && <span>À verser au client : <strong>{fmt(payout)} {c.to_currency}</strong></span>}
+                    {benefit !== null && <span>Bénéfice FlashPay : <strong>{fmt(benefit)} {c.to_currency}</strong></span>}
+                    {payout === null && <span className="adm-meta">Saisis le taux pour voir le montant à verser et ton bénéfice.</span>}
+                  </div>
+                );
+              })()}
               <div className="adm-row">
                 <button className="adm-btn" disabled={busy} onClick={() => act({ action: "complete_conversion", id: c.id, rate: Number(convRate[c.id]) }, "Conversion terminée.")}>Terminer</button>
               </div>
