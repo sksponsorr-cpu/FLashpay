@@ -12,8 +12,8 @@ const verifLabel: Record<string, string> = {
   rejected: "Refusé",
 };
 
-export default function SettingsView({ appId }: { appId: string }) {
-  const [tab, setTab] = useState<"app" | "verif" | "security">("app");
+export default function SettingsView({ appId, initialTab = "app" }: { appId: string; initialTab?: "app" | "verif" | "security" }) {
+  const [tab, setTab] = useState<"app" | "verif" | "security">(initialTab);
   const [app, setApp] = useState<App | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [name, setName] = useState("");
