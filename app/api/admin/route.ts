@@ -69,7 +69,7 @@ export async function GET() {
     const isOk = t.status === "successful";
     const isFail = t.status === "failed" || t.status === "expired" || t.status === "cancelled";
     if (isOk) counts.successful += 1; else if (isFail) counts.failed += 1; else counts.pending += 1;
-    const row = byOwner.get(t.owner_id) ?? { owner_id: t.owner_id, email: emailById.get(t.owner_id) ?? "", successful_count: 0, pending_count: 0, failed_count: 0, volume: {} };
+    const row: Row = byOwner.get(t.owner_id) ?? { owner_id: t.owner_id, email: emailById.get(t.owner_id) ?? "", successful_count: 0, pending_count: 0, failed_count: 0, volume: {} as Record<string, number> };
     if (isOk) {
       row.successful_count += 1;
       row.volume[t.currency_code] = (row.volume[t.currency_code] ?? 0) + Number(t.amount);
