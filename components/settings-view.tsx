@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import IdentityForm from "@/components/identity-form";
 import { createClient } from "@/lib/supabase/client";
 
 type App = { id: string; name: string; website: string | null; category: string };
@@ -16,6 +17,7 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
   const [tab, setTab] = useState<"app" | "verif" | "security">(initialTab);
   const [app, setApp] = useState<App | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [rejection, setRejection] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [website, setWebsite] = useState("");
   const [category, setCategory] = useState("Autre");
@@ -36,6 +38,9 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
       }
       const { data: profile } = await supabase.from("profiles").select("verification_status").single();
       if (alive) setStatus(profile?.verification_status ?? null);
+      // Dernière demande : si elle a été rejetée, on affiche le motif
+      const { data: last } = await supabase.from("identity_verifications").select("status,rejection_reason").order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (alive && last?.status === "rejected") setRejection(last.rejection_reason ?? "Documents non conformes.");
     })();
     return () => { alive = false; };
   }, [appId]);
@@ -100,8 +105,15 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
       {tab === "verif" && (
         <div className="dash-card set-card">
           <strong>Vérification d’identité</strong>
-          <p className="dash-muted">Statut : <b>{status ? (verifLabel[status] ?? status) : "Non disponible"}</b></p>
-          <p className="dash-muted">Pour modifier ces informations, contacte le support.</p>
+          {status === "verified" && <p className="dash-muted">Statut : <b>Vérifié</b>. Ton identité est confirmée.</p>}
+          {status === "under_review" && <p className="dash-muted">Statut : <b>En cours d’examen</b>. Nous revenons vers toi après vérification.</p>}
+          {status !== "verified" && status !== "under_review" && (
+            <>
+              {rejection && <p className="dash-muted" style={{ color: "#c8321a" }}>Ta dernière demande a été rejetée : <b>{rejection}</b>. Corrige les informations puis renvoie-la.</p>}
+              <p className="dash-muted">Statut : <b>{status ? (verifLabel[status] ?? status) : "Non vérifié"}</b>. Envoie les informations ci-dessous pour passer en mode production.</p>
+              <IdentityForm onSubmitted={() => { setRejection(null); setStatus("under_review"); }} />
+            </>
+          )}
         </div>
       )}
 
