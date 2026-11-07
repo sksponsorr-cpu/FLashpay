@@ -38,19 +38,7 @@ function DashboardContent() {
   const [bellOpen, setBellOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"app"|"verif"|"security">("app");
   const [autoWithdraw, setAutoWithdraw] = useState(false);
-  const [plan, setPlan] = useState<string | null>(null);
-  useEffect(() => {
-    if (!appId) return;
-    let alive = true;
-    (async () => {
-      try {
-        const r = await fetch(`/api/wallet?app=${encodeURIComponent(appId)}`, { cache: "no-store" });
-        const j = await r.json();
-        if (alive) setPlan(j.plan ?? null);
-      } catch { /* plan non disponible */ }
-    })();
-    return () => { alive = false; };
-  }, [appId]);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -65,6 +53,19 @@ function DashboardContent() {
   const pathname = usePathname();
   const params = useSearchParams();
   const appId = params.get("app") ?? "";
+  const [plan, setPlan] = useState<string | null>(null);
+  useEffect(() => {
+    if (!appId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`/api/wallet?app=${encodeURIComponent(appId)}`, { cache: "no-store" });
+        const j = await r.json();
+        if (alive) setPlan(j.plan ?? null);
+      } catch { /* plan non disponible */ }
+    })();
+    return () => { alive = false; };
+  }, [appId]);
   const [active, setActive] = useState<Section>("overview");
   const [menuOpen, setMenuOpen] = useState(false);
   const [apps, setApps] = useState<AppOption[]>([]);
