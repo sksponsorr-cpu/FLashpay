@@ -36,6 +36,7 @@ const styles = `
 function DashboardContent() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"app"|"verif"|"security">("app");
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -80,13 +81,13 @@ function DashboardContent() {
   function selectApp(nextId: string) { router.replace(`${pathname}?app=${encodeURIComponent(nextId)}`); }
 
   return <main className="dashboard"><style>{styles}</style><div className="dash-layout">
-    <aside className={`dash-side ${menuOpen ? "open" : ""}`}><div className="dash-brand"><span className="dash-logo">f</span>flash<span style={{color:"#e8401f"}}>pay</span></div>{appId&&<AppSwitcher currentId={appId} onChange={(id)=>router.push(`${pathname}?app=${encodeURIComponent(id)}`)}/>}{sections.map(({id,label,icon:Icon})=><button key={id} className={`dash-nav ${active===id?"active":""}`} onClick={()=>{setActive(id);setMenuOpen(false)}}><Icon size={18}/>{label}</button>)}<a className="dash-nav" href="/apps">← Mes applications</a>{isAdmin&&<a className="dash-nav" href="/admin" style={{marginTop:14}}>Bureau d’administration</a>}
+    <aside className={`dash-side ${menuOpen ? "open" : ""}`}><div className="dash-brand"><span className="dash-logo">f</span>flash<span style={{color:"#e8401f"}}>pay</span></div>{appId&&<AppSwitcher currentId={appId} onChange={(id)=>router.push(`${pathname}?app=${encodeURIComponent(id)}`)}/>}{isAdmin&&<a className="dash-nav" href="/admin" style={{marginBottom:10}}>Bureau d’administration</a>}{sections.map(({id,label,icon:Icon})=><button key={id} className={`dash-nav ${active===id?"active":""}`} onClick={()=>{setActive(id);setMenuOpen(false)}}><Icon size={18}/>{label}</button>)}<a className="dash-nav" href="/apps">← Mes applications</a>
     </aside>
     <div className={`dash-scrim ${menuOpen?"open":""}`} onClick={()=>setMenuOpen(false)}/><div className="dash-main">
       <header className="dash-top"><button className="dash-menu" aria-label="Ouvrir le menu" onClick={()=>setMenuOpen(true)}><Menu size={20}/></button><button className="dash-bell" aria-label="Notifications" onClick={()=>setBellOpen(v=>!v)}>🔔</button>{bellOpen&&<div className="dash-bell-pop" role="status">Aucune notification pour l’instant.</div>}<AccountMenu onSettings={()=>setActive("settings")}/><select className="dash-app-select" aria-label="Choisir une application" value={currentApp?.id ?? ""} disabled={!apps.length} onChange={(event)=>selectApp(event.target.value)}>{apps.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select></header>
       <div className="dash-content"><header className="dash-head"><h1>{currentSection.label}</h1>{appsError&&<p role="alert" className="dash-muted">{appsError}</p>}</header>
-        {active==="overview"&&<VerificationBanner onOpenSettings={()=>setActive("settings")}/>}
-        {appId&&active==="overview"&&<><TestFunds appId={appId}/><WalletOverview appId={appId} onSubmitted={(mode)=>setActive(mode==="withdraw"?"withdrawals":"wallet")}/></>}
+        {active==="overview"&&<VerificationBanner onOpenSettings={()=>{setSettingsTab("verif");setActive("settings")}}/>}
+        {appId&&active==="overview"&&<><TestFunds appId={appId}/><WalletOverview appId={appId} onSubmitted={()=>setActive("withdrawals")}/></>}
         {appId&&active==="wallet"&&<><TestFunds appId={appId}/><WalletOverview appId={appId} onSubmitted={(mode)=>setActive(mode==="withdraw"?"withdrawals":"wallet")}/></>}
         {appId&&active==="transactions"&&<section className="dash-card"><h2>Toutes les transactions</h2><TransactionsList appId={appId}/></section>}
         {appId&&active==="withdrawals"&&<WithdrawalsView appId={appId} onNew={()=>setActive("wallet")}/>}
@@ -107,7 +108,7 @@ function DashboardContent() {
           </div>
           <div className="dash-card plan-note"><strong>Le client paie 2,5 % en plus</strong><span className="dash-muted">Ce supplément est affiché à ton client au moment du paiement, il ne réduit pas ce que tu reçois.</span></div>
         </section>}
-        {appId&&active==="settings"&&<SettingsView appId={appId}/>}
+        {appId&&active==="settings"&&<SettingsView appId={appId} initialTab={settingsTab}/>}
       </div>
     </div>
   </div></main>;
