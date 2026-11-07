@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import CameraCapture from "@/components/camera-capture";
 
 type Country = { code: string; name: string };
 const docTypes: { value: string; label: string }[] = [
@@ -82,12 +83,8 @@ export default function IdentityForm({ onSubmitted }: { onSubmitted: () => void 
       <label className="set-field"><span>Numéro de la pièce</span>
         <input className="set-input" value={docNumber} onChange={(e) => setDocNumber(e.target.value)} required />
       </label>
-      <label className="set-field"><span>Photo de ta pièce (recto)</span>
-        <input className="set-input" type="file" accept="image/*" onChange={(e) => setDoc(e.target.files?.[0] ?? null)} required />
-      </label>
-      <label className="set-field"><span>Ta photo, tenant ta pièce à côté du visage</span>
-        <input className="set-input" type="file" accept="image/*" capture="user" onChange={(e) => setSelfie(e.target.files?.[0] ?? null)} required />
-      </label>
+      <CameraCapture label="Photo de ta pièce (recto)" onCapture={setDoc} />
+      <CameraCapture label="Ta photo, tenant ta pièce à côté du visage" onCapture={setSelfie} />
       <p className="dash-muted">Ces documents sont privés. Seule l’équipe FlashPay peut les consulter, pour vérifier ton identité.</p>
       {message && <p className="dash-muted" role="status">{message}</p>}
       <button className="primary-button" disabled={busy}>{busy ? "Envoi…" : "Envoyer ma demande"}</button>
