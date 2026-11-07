@@ -26,7 +26,7 @@ const dateFmt = (v: string) =>
 
 type Action = { currency: string; mode: "withdraw" | "convert" } | null;
 
-export default function WalletOverview({ appId, onSubmitted }: { appId: string; onSubmitted?: (mode: "withdraw" | "convert") => void }) {
+export default function WalletOverview({ appId, onSubmitted, autoWithdraw = false }: { appId: string; onSubmitted?: (mode: "withdraw" | "convert") => void; autoWithdraw?: boolean }) {
   const [data, setData] = useState<WalletData | null>(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState<Action>(null);
@@ -48,6 +48,15 @@ export default function WalletOverview({ appId, onSubmitted }: { appId: string; 
   }
 
   useEffect(() => { void load(); }, [appId]);
+
+  // Ouvre directement le formulaire de retrait (depuis « Demander un retrait »)
+  useEffect(() => {
+    if (autoWithdraw && data && data.wallets.length > 0 && !open) {
+      const withBalance = data.wallets.find((w) => w.balance > 0) ?? data.wallets[0];
+      openAction(withBalance.currency_code, "withdraw");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoWithdraw, data]);
 
   function openAction(currency: string, mode: "withdraw" | "convert") {
     setOpen({ currency, mode });
