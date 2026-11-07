@@ -1,6 +1,178 @@
 "use client";
 import { useEffect, useState } from "react";
-type Withdrawal={id:string;owner_id:string;currency_code:string;requested_amount:number;fee_amount:number;payout_amount:number;created_at:string};type Conversion={id:string;owner_id:string;from_currency:string;to_currency:string;amount:number;fee_rate:number;created_at:string};type Rate={from_currency:string;to_currency:string;rate:number};type Minimum={currency_code:string;minimum_amount:number};type AdminData={withdrawals:Withdrawal[];conversions:Conversion[];rates:Rate[];minimums:Minimum[]};const fmt=(n:number)=>new Intl.NumberFormat("fr-FR",{maximumFractionDigits:2}).format(n);
-const css=`.admin{min-height:100vh;background:#fffaf8;color:#17211b;padding:28px 16px;font-family:inherit}.admin *{box-sizing:border-box}.admin-wrap{max-width:1000px;margin:auto;display:grid;gap:18px}.admin header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.admin h1{margin:0;font-size:30px}.admin h2{font-size:20px;margin:0 0 14px}.admin p{color:#627168;line-height:1.5}.admin a{color:#d93a1f;text-decoration:none;font-weight:700}.admin-panel{background:white;border:1px solid #f3e3dc;border-radius:18px;padding:20px}.admin-item{border-top:1px solid #f3e3dc;padding:14px 0;display:grid;gap:10px}.admin-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px}.admin input,.admin select{width:100%;min-width:0;height:44px;border:1px solid #efd9cf;border-radius:10px;padding:0 11px;background:#fffaf8;font:inherit}.admin button{min-height:42px;border:0;border-radius:10px;background:linear-gradient(180deg,#ff6a3d,#e8401f);color:#fff;font-weight:700;padding:0 14px;cursor:pointer}.admin button.secondary{background:#fff0eb;color:#b83820;border:1px solid #f3e3dc}.admin button:disabled{opacity:.55}.admin-notice{background:#fff0eb;color:#9b351f;padding:12px;border-radius:12px}@media(max-width:520px){.admin{padding:18px 12px}.admin h1{font-size:25px}.admin-panel{padding:16px}}
-`;
-export default function AdminPage(){const[data,setData]=useState<AdminData|null>(null);const[message,setMessage]=useState("");const[busy,setBusy]=useState(false);const[conversionRates,setConversionRates]=useState<Record<string,string>>({});const[sub,setSub]=useState({owner_id:"",plan:"basic",months:"1"});const[rate,setRate]=useState({from:"XAF",to:"USD",value:""});const[minimum,setMinimum]=useState({currency:"XAF",value:""});async function load(){try{const r=await fetch("/api/admin",{cache:"no-store"});const j=await r.json();if(!r.ok)throw new Error(j.message||"Impossible de charger l’espace admin.");setData(j);setMessage("")}catch(e){setMessage(e instanceof Error?e.message:"Erreur de chargement")}}useEffect(()=>{void load()},[]);async function act(payload:Record<string,unknown>){setBusy(true);setMessage("");try{const r=await fetch("/api/admin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const j=await r.json();if(!r.ok)throw new Error(j.message||"Action refusée.");setMessage("Action enregistrée.");await load()}catch(e){setMessage(e instanceof Error?e.message:"Action refusée.")}finally{setBusy(false)}}if(!data)return <main className="admin"><style>{css}</style><div className="admin-wrap"><header><h1>Administration FlashPay</h1><a href="/apps">Mes applications</a></header>{message&&<p className="admin-notice" role="alert">{message}</p>}<p>Chargement de l’espace sécurisé…</p></div></main>;return <main className="admin"><style>{css}</style><div className="admin-wrap"><header><h1>Administration FlashPay</h1><a href="/apps">Mes applications</a></header>{message&&<p className="admin-notice" role="status">{message}</p>}<section className="admin-panel"><h2>Retraits en attente ({data.withdrawals.length})</h2>{data.withdrawals.length===0?<p>Aucun retrait en attente.</p>:data.withdrawals.map(x=><div className="admin-item" key={x.id}><strong>{fmt(x.payout_amount)} {x.currency_code} à verser</strong><span>Demandé {fmt(x.requested_amount)} · frais {fmt(x.fee_amount)} · compte {x.owner_id}</span><div className="admin-form"><button disabled={busy} onClick={()=>void act({action:"mark_withdrawal_paid",id:x.id})}>Marquer payé</button><button className="secondary" disabled={busy} onClick={()=>void act({action:"reject_withdrawal",id:x.id})}>Rejeter</button></div></div>)}</section><section className="admin-panel"><h2>Conversions en attente ({data.conversions.length})</h2>{data.conversions.map(x=><div className="admin-item" key={x.id}><strong>{fmt(x.amount)} {x.from_currency} → {x.to_currency} · compte {x.owner_id}</strong><div className="admin-form"><input inputMode="decimal" placeholder="Taux appliqué" value={conversionRates[x.id]||""} onChange={e=>setConversionRates({...conversionRates,[x.id]:e.target.value})}/><button disabled={busy||!conversionRates[x.id]} onClick={()=>void act({action:"complete_conversion",id:x.id,rate:Number(conversionRates[x.id])})}>Terminer</button></div></div>)}</section><section className="admin-panel"><h2>Activer un abonnement</h2><div className="admin-form"><input placeholder="ID du compte" value={sub.owner_id} onChange={e=>setSub({...sub,owner_id:e.target.value})}/><select value={sub.plan} onChange={e=>setSub({...sub,plan:e.target.value})}><option value="basic">Basic</option><option value="premium">Premium</option></select><input inputMode="numeric" value={sub.months} onChange={e=>setSub({...sub,months:e.target.value})}/><button disabled={busy||!sub.owner_id} onClick={()=>void act({action:"activate_subscription",owner_id:sub.owner_id,plan:sub.plan,months:Number(sub.months)})}>Activer</button></div></section><section className="admin-panel"><h2>Taux de change</h2>{data.rates.map(x=><p key={`${x.from_currency}-${x.to_currency}`}>1 {x.from_currency} = {x.rate} {x.to_currency}</p>)}<div className="admin-form"><input value={rate.from} onChange={e=>setRate({...rate,from:e.target.value})} placeholder="De (XAF)"/><input value={rate.to} onChange={e=>setRate({...rate,to:e.target.value})} placeholder="Vers (USD)"/><input inputMode="decimal" value={rate.value} onChange={e=>setRate({...rate,value:e.target.value})} placeholder="Taux"/><button disabled={busy||!rate.value} onClick={()=>void act({action:"set_rate",from_currency:rate.from,to_currency:rate.to,rate:Number(rate.value)})}>Enregistrer</button></div></section><section className="admin-panel"><h2>Minimums de retrait</h2>{data.minimums.map(x=><p key={x.currency_code}>{x.currency_code} : {fmt(x.minimum_amount)}</p>)}<div className="admin-form"><input value={minimum.currency} onChange={e=>setMinimum({...minimum,currency:e.target.value})} placeholder="Devise"/><input inputMode="decimal" value={minimum.value} onChange={e=>setMinimum({...minimum,value:e.target.value})} placeholder="Minimum"/><button disabled={busy||!minimum.value} onClick={()=>void act({action:"set_minimum",currency_code:minimum.currency,minimum_amount:Number(minimum.value)})}>Enregistrer</button></div></section></div></main>}
+import Link from "next/link";
+
+type Withdrawal = { id: string; currency_code: string; requested_amount: number; payout_amount: number; fee_amount: number; destination_details: unknown; created_at: string };
+type Conversion = { id: string; from_currency: string; to_currency: string; amount: number; created_at: string };
+type Rate = { from_currency: string; to_currency: string; rate: number };
+type Minimum = { currency_code: string; minimum_amount: number };
+type Data = { withdrawals: Withdrawal[]; conversions: Conversion[]; rates: Rate[]; minimums: Minimum[] };
+
+const fmt = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n);
+const dateFmt = (v: string) => new Date(v).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+export default function AdminPage() {
+  const [step, setStep] = useState<"withdrawals" | "conversions" | "rates" | "subs">("withdrawals");
+  const [data, setData] = useState<Data | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  // Champs des formulaires
+  const [convRate, setConvRate] = useState<Record<string, string>>({});
+  const [rateForm, setRateForm] = useState({ from: "CDF", to: "USD", rate: "" });
+  const [minForm, setMinForm] = useState({ currency: "XAF", minimum: "" });
+  const [subForm, setSubForm] = useState({ owner: "", plan: "basic", months: "1" });
+
+  async function load() {
+    try {
+      const response = await fetch("/api/admin", { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message ?? "Accès refusé.");
+      setData(result as Data);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de charger l’espace admin.");
+    }
+  }
+  useEffect(() => { void load(); }, []);
+
+  async function act(body: Record<string, unknown>, ok: string) {
+    setBusy(true); setNotice("");
+    try {
+      const response = await fetch("/api/admin", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message ?? "Action refusée.");
+      setNotice(ok);
+      await load();
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Action refusée.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const tabs: { id: typeof step; label: string; count?: number }[] = [
+    { id: "withdrawals", label: "Retraits", count: data?.withdrawals.length },
+    { id: "conversions", label: "Conversions", count: data?.conversions.length },
+    { id: "rates", label: "Taux et minimums" },
+    { id: "subs", label: "Abonnements" },
+  ];
+
+  return (
+    <main className="adm">
+      <style>{`
+        .adm{min-height:100vh;background:#fffaf8;color:#17211b;padding:18px 16px 40px;font-family:inherit;color-scheme:light}
+        .adm-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+        .adm h1{font-size:24px;margin:0;font-weight:800}
+        .adm-back{color:#e8401f;font-weight:700;font-size:14px}
+        .adm-sub{color:#6b7f74;font-size:14px;margin:0 0 14px}
+        .adm-tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px}
+        .adm-tab{flex:none;min-height:42px;padding:0 14px;border:1px solid #efd9cf;border-radius:14px;background:#fff;color:#55566a;font-weight:700;cursor:pointer}
+        .adm-tab.on{background:#e8401f;border-color:#e8401f;color:#fff}
+        .adm-card{background:#fff;border:1px solid #f3e3dc;border-radius:20px;padding:16px;margin-bottom:12px;box-shadow:0 8px 24px #17211b0d;display:grid;gap:10px}
+        .adm-card h2{font-size:17px;margin:0}
+        .adm-meta{color:#6b7f74;font-size:13px;word-break:break-all}
+        .adm-row{display:flex;gap:8px;flex-wrap:wrap}
+        .adm-btn{min-height:44px;padding:0 16px;border:0;border-radius:14px;background:#e8401f;color:#fff;font-weight:800;cursor:pointer}
+        .adm-btn.g{background:#fff;color:#e8401f;border:1px solid #efd9cf}
+        .adm-btn:disabled{opacity:.55}
+        .adm-in{min-height:46px;padding:0 12px;border:1px solid #efd9cf;border-radius:14px;background:#fffaf8;font:inherit;width:100%}
+        .adm-note{padding:12px 14px;border-radius:14px;background:#fff0eb;color:#8a2a14;font-size:14px}
+        .adm-empty{color:#6b7f74;font-size:14px}
+        .adm-err{color:#c8321a;font-weight:600}
+        .adm-list{display:grid;gap:4px;font-size:14px;color:#55566a}
+      `}</style>
+
+      <div className="adm-top">
+        <h1>Bureau d’administration</h1>
+        <Link className="adm-back" href="/dashboard">← Tableau de bord</Link>
+      </div>
+      <p className="adm-sub">Une étape à la fois : choisis une rubrique, traite les demandes, puis lis le message de confirmation.</p>
+
+      {error && <p className="adm-err">{error}</p>}
+      {notice && <div className="adm-note" role="status">{notice}</div>}
+
+      <nav className="adm-tabs" role="tablist">
+        {tabs.map((t) => (
+          <button key={t.id} role="tab" aria-selected={step === t.id} className={step === t.id ? "adm-tab on" : "adm-tab"} onClick={() => { setStep(t.id); setNotice(""); }}>
+            {t.label}{t.count !== undefined ? ` (${t.count})` : ""}
+          </button>
+        ))}
+      </nav>
+
+      {step === "withdrawals" && (
+        <section>
+          <p className="adm-sub">Demandes de retrait en attente. Marque-les payées une fois l’argent envoyé, ou rejette-les.</p>
+          {data && data.withdrawals.length === 0 && <p className="adm-empty">Aucune demande en attente.</p>}
+          {data?.withdrawals.map((w) => (
+            <div className="adm-card" key={w.id}>
+              <h2>{fmt(w.payout_amount)} {w.currency_code} à verser</h2>
+              <div className="adm-list"><span>Demandé : {fmt(w.requested_amount)} {w.currency_code} · frais : {fmt(w.fee_amount)}</span><span>{dateFmt(w.created_at)}</span></div>
+              <span className="adm-meta">Destination : {JSON.stringify(w.destination_details ?? {})}</span>
+              <div className="adm-row">
+                <button className="adm-btn" disabled={busy} onClick={() => act({ action: "mark_withdrawal_paid", id: w.id }, "Retrait marqué comme payé.")}>Marquer payé</button>
+                <button className="adm-btn g" disabled={busy} onClick={() => act({ action: "reject_withdrawal", id: w.id }, "Retrait rejeté.")}>Rejeter</button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {step === "conversions" && (
+        <section>
+          <p className="adm-sub">Conversions en attente. Saisis le taux appliqué, puis termine.</p>
+          {data && data.conversions.length === 0 && <p className="adm-empty">Aucune conversion en attente.</p>}
+          {data?.conversions.map((c) => (
+            <div className="adm-card" key={c.id}>
+              <h2>{fmt(c.amount)} {c.from_currency} → {c.to_currency}</h2>
+              <span className="adm-meta">{dateFmt(c.created_at)}</span>
+              <input className="adm-in" inputMode="decimal" placeholder="Taux appliqué" value={convRate[c.id] ?? ""} onChange={(e) => setConvRate({ ...convRate, [c.id]: e.target.value })} />
+              <div className="adm-row">
+                <button className="adm-btn" disabled={busy} onClick={() => act({ action: "complete_conversion", id: c.id, rate: Number(convRate[c.id]) }, "Conversion terminée.")}>Terminer</button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {step === "rates" && (
+        <section>
+          <div className="adm-card">
+            <h2>Taux de change</h2>
+            <div className="adm-list">{data?.rates.map((r) => <span key={`${r.from_currency}-${r.to_currency}`}>{r.from_currency} → {r.to_currency} : {r.rate}</span>)}</div>
+            <input className="adm-in" placeholder="Devise de départ (ex. CDF)" value={rateForm.from} onChange={(e) => setRateForm({ ...rateForm, from: e.target.value })} />
+            <input className="adm-in" placeholder="Devise d’arrivée (ex. USD)" value={rateForm.to} onChange={(e) => setRateForm({ ...rateForm, to: e.target.value })} />
+            <input className="adm-in" inputMode="decimal" placeholder="Taux" value={rateForm.rate} onChange={(e) => setRateForm({ ...rateForm, rate: e.target.value })} />
+            <button className="adm-btn" disabled={busy} onClick={() => act({ action: "set_rate", from_currency: rateForm.from, to_currency: rateForm.to, rate: Number(rateForm.rate) }, "Taux enregistré.")}>Enregistrer le taux</button>
+          </div>
+          <div className="adm-card">
+            <h2>Minimums de retrait</h2>
+            <div className="adm-list">{data?.minimums.map((m) => <span key={m.currency_code}>{m.currency_code} : {fmt(m.minimum_amount)}</span>)}</div>
+            <input className="adm-in" placeholder="Devise (ex. XAF)" value={minForm.currency} onChange={(e) => setMinForm({ ...minForm, currency: e.target.value })} />
+            <input className="adm-in" inputMode="decimal" placeholder="Minimum" value={minForm.minimum} onChange={(e) => setMinForm({ ...minForm, minimum: e.target.value })} />
+            <button className="adm-btn" disabled={busy} onClick={() => act({ action: "set_minimum", currency_code: minForm.currency, minimum_amount: Number(minForm.minimum) }, "Minimum enregistré.")}>Enregistrer le minimum</button>
+          </div>
+        </section>
+      )}
+
+      {step === "subs" && (
+        <section>
+          <div className="adm-card">
+            <h2>Activer un abonnement</h2>
+            <p className="adm-meta">Identifiant du compte marchand (owner_id), trouvé dans la base.</p>
+            <input className="adm-in" placeholder="Identifiant du compte" value={subForm.owner} onChange={(e) => setSubForm({ ...subForm, owner: e.target.value })} />
+            <select className="adm-in" value={subForm.plan} onChange={(e) => setSubForm({ ...subForm, plan: e.target.value })}>
+              <option value="basic">Basic</option>
+              <option value="premium">Premium</option>
+            </select>
+            <input className="adm-in" inputMode="numeric" placeholder="Nombre de mois" value={subForm.months} onChange={(e) => setSubForm({ ...subForm, months: e.target.value })} />
+            <button className="adm-btn" disabled={busy} onClick={() => act({ action: "activate_subscription", owner_id: subForm.owner, plan: subForm.plan, months: Number(subForm.months) }, "Abonnement activé.")}>Activer</button>
+          </div>
+        </section>
+      )}
+    </main>
+  );
+}
