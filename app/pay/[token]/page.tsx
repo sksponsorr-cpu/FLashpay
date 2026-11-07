@@ -52,6 +52,7 @@ function PayContent() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [doneMessage, setDoneMessage] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -69,17 +70,17 @@ function PayContent() {
     setBusy(true);
     setError("");
     try {
-      const supabase = createClient();
-      const { error } = await supabase.rpc("pay_payment_link", { p_token: token, p_name: name, p_mobile: mobile, p_operator: operator });
-      if (error) throw error;
+      const response = await fetch(`/api/pay/${encodeURIComponent(token)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, mobile, operator }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message ?? "Le paiement n’a pas pu être effectué.");
+      setDoneMessage(result.message ?? "Paiement enregistré.");
       setDone(true);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      setError(
-        msg.includes("LINK_INACTIVE") ? "Ce lien n’est plus actif." :
-        msg.includes("PAYER_REQUIRED") ? "Choisis ton opérateur et indique ton nom et ton numéro." :
-        "Le paiement n’a pas pu être effectué."
-      );
+      setError(err instanceof Error ? err.message : "Le paiement n’a pas pu être effectué.");
     } finally {
       setBusy(false);
     }
@@ -123,7 +124,7 @@ function PayContent() {
         {done && (
           <>
             <h1>Paiement enregistré</h1>
-            <p className="pay-msg">Le paiement de test a été enregistré. Aucun argent réel n’a été débité.</p>
+            <p className="pay-msg">{doneMessage}</p>
           </>
         )}
       </div>
