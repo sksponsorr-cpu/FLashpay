@@ -21,8 +21,8 @@ export async function GET(request: Request) {
   const [wallets, movements, withdrawals, conversions, minimums, rates, subscriptions] = await Promise.all([
     supabase.from("wallets").select("currency_code, balance").eq("app_id", appId).order("currency_code"),
     supabase.from("wallet_movements").select("id, currency_code, kind, amount, balance_after, created_at").eq("app_id", appId).order("created_at", { ascending: false }).limit(50),
-    supabase.from("withdrawal_requests").select("id, currency_code, requested_amount, payout_amount, fee_amount, status, created_at").order("created_at", { ascending: false }).limit(20),
-    supabase.from("conversion_requests").select("id, from_currency, to_currency, amount, status, received_amount, created_at").order("created_at", { ascending: false }).limit(20),
+    supabase.from("withdrawal_requests").select("id, currency_code, requested_amount, payout_amount, fee_amount, status, created_at").eq("app_id", appId).order("created_at", { ascending: false }).limit(20),
+    supabase.from("conversion_requests").select("id, from_currency, to_currency, amount, status, received_amount, created_at").eq("app_id", appId).order("created_at", { ascending: false }).limit(20),
     supabase.from("withdrawal_minimums").select("currency_code, minimum_amount"),
     supabase.from("fx_rates").select("from_currency, to_currency, rate"),
     supabase.from("subscriptions").select("plan, current_period_end").eq("app_id", appId).order("current_period_end", { ascending: false }).limit(1),
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   const { data: app } = await supabase.from("apps").select("id").eq("id", body.app_id).eq("owner_id", user.id).maybeSingle();
   if (!app) return NextResponse.json({ message: "Application introuvable." }, { status: 404 });
   const result = body.action === "withdraw"
-    ? await supabase.rpc("request_withdrawal_for_app", { p_app_id: body.app_id, p_currency: body.currency_code, p_amount: body.amount })
+    ? await supabase.rpc("request_withdrawal_for_app", { p_app_id: body.app_id, p_currency: body.currency_code, p_amount: body.amount, p_country: body.destination?.country_code ?? "", p_operator: body.destination?.operator ?? "", p_mobile: body.destination?.mobile ?? "", p_name: body.destination?.name ?? "" })
     : body.action === "convert"
       ? await supabase.rpc("request_conversion_for_app", { p_app_id: body.app_id, p_from: body.from_currency, p_to: body.to_currency, p_amount: body.amount })
       : null;
