@@ -6,17 +6,20 @@ type Withdrawal = { id: string; currency_code: string; requested_amount: number;
 type Conversion = { id: string; from_currency: string; to_currency: string; amount: number; created_at: string };
 type Rate = { from_currency: string; to_currency: string; rate: number };
 type Minimum = { currency_code: string; minimum_amount: number };
-type Data = { withdrawals: Withdrawal[]; conversions: Conversion[]; rates: Rate[]; minimums: Minimum[] };
+type Account = { id: string; email: string };
+type Identity = { id: string; owner_id: string; full_name: string; country_code: string; document_type: string; document_number: string; status: string; created_at: string; document_url: string | null; selfie_url: string | null };
+type Data = { withdrawals: Withdrawal[]; conversions: Conversion[]; rates: Rate[]; minimums: Minimum[]; accounts: Account[]; identities: Identity[]; overview?: { users: number; transactions: { total: number; successful: number; pending: number; failed: number }; withdrawals: { total: number; delivered: number; pending: number; not_delivered: number }; merchants: { owner_id: string; email: string; successful_count: number; pending_count: number; failed_count: number; volume: Record<string, number> }[] } };
 
 const fmt = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n);
 const dateFmt = (v: string) => new Date(v).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default function AdminPage() {
-  const [step, setStep] = useState<"withdrawals" | "conversions" | "rates" | "subs">("withdrawals");
+  const [step, setStep] = useState<"overview" | "withdrawals" | "conversions" | "rates" | "subs" | "ids">("overview");
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [reasons, setReasons] = useState<Record<string, string>>({});
 
   // Champs des formulaires
   const [convRate, setConvRate] = useState<Record<string, string>>({});
@@ -55,9 +58,11 @@ export default function AdminPage() {
   }
 
   const tabs: { id: typeof step; label: string; count?: number }[] = [
+    { id: "overview", label: "Vue d’ensemble" },
     { id: "withdrawals", label: "Retraits", count: data?.withdrawals.length },
     { id: "conversions", label: "Conversions", count: data?.conversions.length },
     { id: "rates", label: "Taux et minimums" },
+    { id: "ids", label: "Identités", count: data?.identities?.length },
     { id: "subs", label: "Abonnements" },
   ];
 
@@ -84,6 +89,19 @@ export default function AdminPage() {
         .adm-empty{color:#6b7f74;font-size:14px}
         .adm-err{color:#c8321a;font-weight:600}
         .adm-list{display:grid;gap:4px;font-size:14px;color:#55566a}
+        .adm-lbl{font-size:13px;font-weight:700;color:#55566a}
+        .adm-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+        @media(min-width:700px){.adm-kpis{grid-template-columns:repeat(3,1fr)}}
+        .adm-kpi{background:#fff;border:1px solid #f3e3dc;border-radius:18px;padding:14px;display:grid;gap:6px;box-shadow:0 8px 24px #17211b0d}
+        .adm-kpi span{font-size:12px;font-weight:700;color:#6b7f74}
+        .adm-kpi strong{font-size:24px;font-weight:800}
+        .adm-kpi.ok strong{color:#13a05a}.adm-kpi.wait strong{color:#b76e00}.adm-kpi.ko strong{color:#c8321a}
+        .adm-h{font-size:17px;margin:18px 0 10px}
+        .adm-table-wrap{overflow-x:auto;background:#fff;border:1px solid #f3e3dc;border-radius:18px}
+        .adm-table{width:100%;border-collapse:collapse;font-size:14px}
+        .adm-table th,.adm-table td{padding:12px 14px;text-align:left;border-bottom:1px solid #f6ece7;white-space:nowrap}
+        .adm-table th{color:#6b7f74;font-size:12px;font-weight:700}
+
       `}</style>
 
       <div className="adm-top">
@@ -102,6 +120,37 @@ export default function AdminPage() {
           </button>
         ))}
       </nav>
+
+      {step === "overview" && (
+        <section>
+          <div className="adm-kpis">
+            <div className="adm-kpi"><span>Utilisateurs</span><strong>{data?.overview?.users ?? "—"}</strong></div>
+            <div className="adm-kpi"><span>Transactions</span><strong>{data?.overview?.transactions.total ?? "—"}</strong></div>
+            <div className="adm-kpi ok"><span>Retraits livrés</span><strong>{data?.overview?.withdrawals.delivered ?? "—"}</strong></div>
+            <div className="adm-kpi wait"><span>Retraits en attente</span><strong>{data?.overview?.withdrawals.pending ?? "—"}</strong></div>
+            <div className="adm-kpi ko"><span>Retraits non livrés</span><strong>{data?.overview?.withdrawals.not_delivered ?? "—"}</strong></div>
+            <div className="adm-kpi"><span>Total des retraits</span><strong>{data?.overview?.withdrawals.total ?? "—"}</strong></div>
+          </div>
+          <h2 className="adm-h">Marchands, du plus gros montant au plus petit</h2>
+          {data?.overview && data.overview.merchants.length === 0 && <p className="adm-empty">Aucune transaction pour le moment.</p>}
+          <div className="adm-table-wrap">
+            <table className="adm-table">
+              <thead><tr><th>Marchand</th><th>Montant encaissé</th><th>Réussies</th><th>En attente</th><th>Échouées</th></tr></thead>
+              <tbody>
+                {data?.overview?.merchants.map((m) => (
+                  <tr key={m.owner_id}>
+                    <td>{m.email || m.owner_id.slice(0, 8)}</td>
+                    <td><strong>{Object.entries(m.volume).map(([c, v]) => `${fmt(v)} ${c}`).join(" · ") || "0"}</strong></td>
+                    <td>{m.successful_count}</td>
+                    <td>{m.pending_count}</td>
+                    <td>{m.failed_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {step === "withdrawals" && (
         <section>
@@ -158,18 +207,48 @@ export default function AdminPage() {
         </section>
       )}
 
+      {step === "ids" && (
+        <section>
+          <p className="adm-sub">Demandes de vérification d’identité en attente. Vérifie la pièce et le selfie, puis approuve ou rejette.</p>
+          {data && (data.identities ?? []).length === 0 && <p className="adm-empty">Aucune demande en attente.</p>}
+          {(data?.identities ?? []).map((i) => (
+            <div className="adm-card" key={i.id}>
+              <h2>{i.full_name}</h2>
+              <span className="adm-meta">{i.country_code} · {i.document_type} · n° {i.document_number}</span>
+              {i.document_url && <img src={i.document_url} alt="Pièce d’identité" style={{ width: "100%", borderRadius: 12 }} />}
+              {i.selfie_url && <img src={i.selfie_url} alt="Selfie avec la pièce" style={{ width: "100%", borderRadius: 12 }} />}
+              <input className="adm-in" placeholder="Motif du rejet (si rejet)" value={reasons[i.id] ?? ""} onChange={(e) => setReasons({ ...reasons, [i.id]: e.target.value })} />
+              <div className="adm-row">
+                <button className="adm-btn" disabled={busy} onClick={() => act({ action: "review_identity", id: i.id, approve: true }, "Identité approuvée. Le compte est vérifié.")}>Approuver</button>
+                <button className="adm-btn g" disabled={busy} onClick={() => act({ action: "review_identity", id: i.id, approve: false, reason: reasons[i.id] }, "Demande rejetée.")}>Rejeter</button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
       {step === "subs" && (
         <section>
           <div className="adm-card">
             <h2>Activer un abonnement</h2>
-            <p className="adm-meta">Identifiant du compte marchand (owner_id), trouvé dans la base.</p>
-            <input className="adm-in" placeholder="Identifiant du compte" value={subForm.owner} onChange={(e) => setSubForm({ ...subForm, owner: e.target.value })} />
-            <select className="adm-in" value={subForm.plan} onChange={(e) => setSubForm({ ...subForm, plan: e.target.value })}>
-              <option value="basic">Basic</option>
-              <option value="premium">Premium</option>
+            <p className="adm-sub">1. Choisis le compte. 2. Choisis le plan. 3. Choisis la durée. 4. Clique sur Activer.</p>
+            <label className="adm-lbl">Compte marchand</label>
+            <select className="adm-in" value={subForm.owner} onChange={(e) => setSubForm({ ...subForm, owner: e.target.value })}>
+              <option value="">— Choisir un compte —</option>
+              {data?.accounts.map((a) => <option key={a.id} value={a.id}>{a.email}</option>)}
             </select>
-            <input className="adm-in" inputMode="numeric" placeholder="Nombre de mois" value={subForm.months} onChange={(e) => setSubForm({ ...subForm, months: e.target.value })} />
-            <button className="adm-btn" disabled={busy} onClick={() => act({ action: "activate_subscription", owner_id: subForm.owner, plan: subForm.plan, months: Number(subForm.months) }, "Abonnement activé.")}>Activer</button>
+            <label className="adm-lbl">Plan</label>
+            <select className="adm-in" value={subForm.plan} onChange={(e) => setSubForm({ ...subForm, plan: e.target.value })}>
+              <option value="basic">Basic : 1 % jusqu’à 200 000 FCFA par mois, puis 6 %</option>
+              <option value="premium">Premium : 1 % jusqu’à 500 000 FCFA par mois, puis 6 %</option>
+            </select>
+            <label className="adm-lbl">Durée</label>
+            <select className="adm-in" value={subForm.months} onChange={(e) => setSubForm({ ...subForm, months: e.target.value })}>
+              <option value="1">1 mois</option>
+              <option value="3">3 mois</option>
+              <option value="12">12 mois</option>
+            </select>
+            <button className="adm-btn" disabled={busy || !subForm.owner} onClick={() => act({ action: "activate_subscription", owner_id: subForm.owner, plan: subForm.plan, months: Number(subForm.months) }, "Abonnement activé.")}>Activer l’abonnement</button>
           </div>
         </section>
       )}
