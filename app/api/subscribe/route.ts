@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const PLANS: Record<string, { amount: number; label: string }> = {
   basic: { amount: 10000, label: "Basic" },
-  premium: { amount: 25000, label: "Premium" },
+  premium: { amount: 20000, label: "Premium" },
 };
 
 type SubscribeBody = {
