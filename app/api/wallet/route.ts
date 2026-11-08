@@ -24,14 +24,17 @@ export async function GET(request: Request) {
     if (!app) return NextResponse.json({ message: "Application introuvable." }, { status: 404 });
   }
 
-  const scope = <T extends { eq: (c: string, v: string) => T }>(query: T) =>
-    appId ? query.eq("app_id", appId) : query.eq("owner_id", user.id);
+  // Requête filtrée par application (si demandée) ou par compte.
+  const scopeBy = (table: string, columns: string) =>
+    appId
+      ? supabase.from(table).select(columns).eq("app_id", appId)
+      : supabase.from(table).select(columns).eq("owner_id", user.id);
 
   const [wallets, movements, withdrawals, conversions, minimums, rates, plan] = await Promise.all([
-    scope(supabase.from("wallets").select("currency_code, balance")).order("currency_code"),
-    scope(supabase.from("wallet_movements").select("id, currency_code, kind, amount, balance_after, created_at")).order("created_at", { ascending: false }).limit(50),
-    scope(supabase.from("withdrawal_requests").select("id, currency_code, requested_amount, fee_amount, payout_amount, status, created_at")).order("created_at", { ascending: false }).limit(20),
-    scope(supabase.from("conversion_requests").select("id, from_currency, to_currency, amount, status, received_amount, created_at")).order("created_at", { ascending: false }).limit(20),
+    scopeBy("wallets", "currency_code, balance").order("currency_code"),
+    scopeBy("wallet_movements", "id, currency_code, kind, amount, balance_after, created_at").order("created_at", { ascending: false }).limit(50),
+    scopeBy("withdrawal_requests", "id, currency_code, requested_amount, fee_amount, payout_amount, status, created_at").order("created_at", { ascending: false }).limit(20),
+    scopeBy("conversion_requests", "id, from_currency, to_currency, amount, status, received_amount, created_at").order("created_at", { ascending: false }).limit(20),
     supabase.from("withdrawal_minimums").select("currency_code, minimum_amount").order("currency_code"),
     supabase.from("fx_rates").select("from_currency, to_currency, rate"),
     supabase.rpc("active_plan", { p_owner: user.id }),
