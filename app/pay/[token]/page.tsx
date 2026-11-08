@@ -31,7 +31,7 @@ const networksByCurrency: Record<string, { name: string; color: string; short: s
   USD: [{ name: "Carte bancaire", color: "#6b6c80", short: "Cb" }],
 };
 
-// Indicatif affiché dans le champ numéro, selon le pays du lien.
+// Indicatif affiché dans le champ numéro, selon la devise du lien.
 const dialByCurrency: Record<string, { code: string; label: string }> = {
   CDF: { code: "+243", label: "RDC" },
   XAF: { code: "+237", label: "Cameroun" },
@@ -43,7 +43,7 @@ const dialByCurrency: Record<string, { code: string; label: string }> = {
   USD: { code: "", label: "" },
 };
 
-// Frais ajoutés au montant, à la charge du client (passé à true côté serveur).
+// Frais ajoutés au montant, à la charge du client (ajoutés côté serveur).
 const CLIENT_FEE_RATE = 0.025;
 
 const extraCss = `.pg-ring{position:relative;width:110px;height:110px;border-radius:50%;background:#f1edff;display:grid;place-items:center;animation:pgPulse 1.8s ease-in-out infinite}.pg-phone{font-size:42px}.pg-steps{display:flex;gap:10px;align-items:center;font-size:14px;color:#55566a}.pg-stepn{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#f1edff;color:#5b3fd6;font-weight:800}@keyframes pgPulse{0%,100%{box-shadow:0 0 0 0 rgba(91,63,214,.25)}50%{box-shadow:0 0 0 22px rgba(91,63,214,0)}}`;
@@ -123,6 +123,7 @@ function PayContent() {
     })();
   }, [token]);
 
+  // Attente de la confirmation sur téléphone (fournisseur à paiement direct).
   useEffect(() => {
     if (!txId || waitStatus === "successful" || waitStatus === "failed") return;
     let tries = 0;
@@ -134,7 +135,9 @@ function PayContent() {
         if (j.status === "successful") { setWaitStatus("successful"); clearInterval(timer); }
         else if (j.status === "failed" || j.status === "cancelled" || j.status === "expired") { setWaitStatus("failed"); clearInterval(timer); }
         else setWaitStatus("pending");
-      } catch { /* on réessaie */ }
+      } catch {
+        // on réessaie au prochain tour
+      }
       if (tries > 60) { setWaitStatus("failed"); clearInterval(timer); }
     }, 3000);
     return () => clearInterval(timer);
@@ -155,7 +158,8 @@ function PayContent() {
   }
 
   async function pay() {
-    setBusy(true); setMsg("");
+    setBusy(true);
+    setMsg("");
     try {
       const response = await fetch(`/api/pay/${encodeURIComponent(token)}`, {
         method: "POST",
@@ -164,11 +168,25 @@ function PayContent() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Le paiement n’a pas pu être effectué.");
+
+      if (result.mode === "test") {
+        setMsg(result.message);
+        setBusy(false);
+        return;
+      }
+
+      // Swychr : redirection vers la page du prestataire.
+      if (result.payment_link) {
+        window.location.assign(result.payment_link);
+        return; // la page quitte le site : on ne réactive pas le bouton
+      }
+
+      // SasPay : paiement direct, on attend la validation sur le téléphone.
       setTxId(result.transaction_id ?? "");
       setWaitStatus("pending");
+      setBusy(false);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Le paiement n’a pas pu être effectué.");
-    } finally {
       setBusy(false);
     }
   }
@@ -286,7 +304,7 @@ function PayContent() {
 
             <div style={{ marginTop: 16 }}>
               {step < 4 && link.is_active && <button className="pg-btn" onClick={next}>Continuer</button>}
-              {step === 4 && <button className="pg-btn" disabled={busy} onClick={() => void pay()}>{busy ? "Redirection…" : `Payer ${fmt(total)} ${link.currency_code}`}</button>}
+              {step === 4 && <button className="pg-btn" disabled={busy} onClick={() => void pay()}>{busy ? "Traitement…" : `Payer ${fmt(total)} ${link.currency_code}`}</button>}
               {step > 1 && step < 5 && <button className="pg-btn pg-ghost" onClick={() => { setStep((s) => s - 1); setMsg(""); }}>Retour</button>}
             </div>
             <p className="pg-foot">Paiement sécurisé · vous serez redirigé vers la page de validation de votre opérateur.</p>
