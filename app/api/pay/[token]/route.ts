@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { randomBytes } from "node:crypto";
-import { createSwychrPaymentRequest } from "@/lib/swychr";
+import { createSwychrPaymentRequest, localMobile, swychrMethod } from "@/lib/swychr";
 import { liveGate } from "@/lib/live-gate";
 
 // Paiement d'un lien : mode test (simulation) ou live (Swychr), avec refus clair si non autorisé.
@@ -65,10 +65,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     {
       country_code: link.country_code,
       name,
-      mobile,
+      mobile: localMobile(link.country_code, mobile),
       transaction_id: transactionId,
       amount,
-      payment_method: operator,
+      payment_method: swychrMethod(operator),
       description: link.label,
       pass_digital_charge: true,
     },
