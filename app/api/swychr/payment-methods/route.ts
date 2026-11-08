@@ -2,71 +2,182 @@ import { NextResponse } from "next/server";
 import { getSupportedCountry } from "@/lib/countries";
 import { createClient } from "@/lib/supabase/server";
 
-const endpoint = "https://api.accountpe.com/api/payout/payout_methods";
+const ENDPOINT =
+  "https://api.accountpe.com/api/payout/payout_methods";
 
 export async function GET(request: Request) {
-  // Seuls les utilisateurs connectés peuvent interroger le compte marchand.
   try {
+    // 1. Vérifier la connexion utilisateur
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
-      return NextResponse.json({ message: "Connecte-toi pour voir les moyens de paiement." }, { status: 401 });
-    }
-  } catch {
-    return NextResponse.json({ message: "Supabase n’est pas disponible." }, { status: 503 });
-  }
-
-  const countryCode = new URL(request.url).searchParams.get("country_code")?.trim().toUpperCase();
-
-  const country = getSupportedCountry(countryCode);
-  if (!country) {
-    return NextResponse.json({ message: "Ce pays n’est pas encore configuré dans FlashPay." }, { status: 400 });
-  }
-
-  const liveEnabled = process.env.SWYCHR_PROVIDER_LOOKUPS_ENABLED === "true";
-  const apiKey = process.env.SWYCHR_API_KEY;
-
-  if (!liveEnabled) {
-    if (countryCode === "CM") {
-      return NextResponse.json({
-        mode: "demo",
-        data: {
-          country: "Cameroun",
-          country_code: "CM",
-          currency_code: "XAF",
-          payment_methods: [
-            { payment_method: "MTN", mobile_format: "6XXXXXXXX", applicable_mobileno_length: "9" },
-            { payment_method: "ORANGE", mobile_format: "6XXXXXXXX", applicable_mobileno_length: "9" },
-          ],
-        },
-      });
-    }
-    return NextResponse.json({ mode: "demo", data: { country: country.name, country_code: countryCode, currency_code: country.currency, payment_methods: [] } });
-  }
-
-  if (!apiKey) {
-    return NextResponse.json({ message: "La clé de paiement serveur n’est pas configurée." }, { status: 503 });
-  }
-
-  try {
-    const providerResponse = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Api-Key": apiKey },
-      body: JSON.stringify({ country_code: countryCode }),
-      signal: AbortSignal.timeout(10000),
-      cache: "no-store",
-    });
-    const providerResult = await providerResponse.json();
-
-    if (!providerResponse.ok || providerResult.status !== 200) {
       return NextResponse.json(
-        { message: providerResult.message ?? "Les moyens de paiement ne sont pas disponibles." },
-        { status: providerResponse.status >= 400 ? providerResponse.status : 400 },
+        { message: "Authentification requise." },
+        { status: 401 }
       );
     }
 
-    return NextResponse.json({ mode: "live", ...providerResult });
-  } catch {
-    return NextResponse.json({ message: "Impossible de récupérer les moyens de paiement." }, { status: 502 });
+    // 2. Vérifier le pays
+    const countryCode = new URL(request.url)
+      .searchParams
+      .get("country_code")
+      ?.trim()
+      .toUpperCase();
+
+    const country = getSupportedCountry(countryCode);
+
+    if (!country) {
+      return NextResponse.json(
+        { message: "Pays non pris en charge." },
+        { status: 400 }
+      );
+    }
+
+    // 3. Vérifier la clé AccountPe
+    const apiKey = process.env.SWYCHR_API_KEY;
+
+    if (!apiKey) {
+      console.error("SWYCHR_API_KEY missing");
+
+      return NextResponse.json(
+        { message: "Configuration AccountPe manquante." },
+        { status: 503 }
+      );
+    }
+
+    // 4. Interroger AccountPe
+    const response = await fetch(ENDPOINT, {
+      method: "POST",
+
+      headers: {
+        "Api-Key": apiKey,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+
+      body: JSON.stringify({
+        country_code: countryCode,
+      }),
+
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    });
+
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok || !result) {
+      console.error(
+        "AccountPe provider error:",
+        response.status,
+        result?.message
+      );
+
+      return NextResponse.json(
+        {
+          message:
+            result?.message ??
+            "Impossible de récupérer les opérateurs.",
+        },
+        { status: 502 }
+      );
+    }
+
+    if (
+      result.status !== 200 &&
+      result.status !== "200"
+    ) {
+      return NextResponse.json(
+        {
+          message:
+            result.message ??
+            "AccountPe n'a retourné aucun opérateur.",
+        },
+        { status: 502 }
+      );
+    }
+
+    const providerData = result.data;
+
+    if (
+      !providerData ||
+      !Array.isArray(providerData.payment_methods)
+    ) {
+      return NextResponse.json(
+        { message: "Réponse AccountPe invalide." },
+        { status: 502 }
+      );
+    }
+
+    // 5. Vérifier la devise
+    if (providerData.currency_code !== country.currency) {
+      console.error("Currency mismatch:", {
+        expected: country.currency,
+        received: providerData.currency_code,
+      });
+
+      return NextResponse.json(
+        {
+          message:
+            "La devise retournée par AccountPe ne correspond pas au pays sélectionné.",
+        },
+        { status: 409 }
+      );
+    }
+
+    // 6. Retourner uniquement les opérateurs réels
+    const paymentMethods = providerData.payment_methods
+      .filter(
+        (method: {
+          payment_method?: string;
+          mobile_format?: string;
+          applicable_mobileno_length?: string;
+        }) =>
+          typeof method.payment_method === "string" &&
+          typeof method.mobile_format === "string"
+      )
+      .map(
+        (method: {
+          payment_method: string;
+          mobile_format: string;
+          applicable_mobileno_length?: string;
+        }) => ({
+          payment_method: method.payment_method,
+          mobile_format: method.mobile_format,
+          applicable_mobileno_length:
+            method.applicable_mobileno_length ?? null,
+        })
+      );
+
+    return NextResponse.json({
+      mode: "live",
+      data: {
+        country: providerData.country,
+        country_code: providerData.country_code,
+        currency_name: providerData.currency_name,
+        currency_code: providerData.currency_code,
+        payment_methods: paymentMethods,
+      },
+      message: result.message,
+      status: 200,
+    });
+
+  } catch (error) {
+    console.error("Payment methods error:", error);
+
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error &&
+          error.name === "TimeoutError"
+            ? "AccountPe met trop de temps à répondre."
+            : "Erreur de connexion au prestataire.",
+      },
+      { status: 502 }
+    );
   }
 }
