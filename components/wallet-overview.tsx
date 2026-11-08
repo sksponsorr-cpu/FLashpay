@@ -12,9 +12,26 @@ type WalletData = {
   fee: { withdrawal: number; conversion: number };
 };
 
+// Pays de destination des retraits, avec leur devise et leurs opérateurs mobile money.
+const DESTINATIONS: Record<string, { name: string; currency: string; operators: string[] }> = {
+  CM: { name: "Cameroun", currency: "XAF", operators: ["MTN MoMo", "Orange Money", "Airtel Money"] },
+  CG: { name: "Congo-Brazzaville", currency: "XAF", operators: ["MTN MoMo", "Airtel Money"] },
+  CD: { name: "RD Congo", currency: "CDF", operators: ["Airtel Money", "Orange Money", "M-Pesa", "Africell Money"] },
+  SN: { name: "Sénégal", currency: "XOF", operators: ["Orange Money", "Wave"] },
+  CI: { name: "Côte d’Ivoire", currency: "XOF", operators: ["Orange Money", "MTN MoMo", "Moov Money", "Wave"] },
+  BF: { name: "Burkina Faso", currency: "XOF", operators: ["Orange Money", "Moov Money"] },
+  BJ: { name: "Bénin", currency: "XOF", operators: ["MTN MoMo", "Moov Money"] },
+  TG: { name: "Togo", currency: "XOF", operators: ["Moov Money"] },
+  ML: { name: "Mali", currency: "XOF", operators: ["Orange Money", "Moov Money"] },
+  RW: { name: "Rwanda", currency: "RWF", operators: ["MTN MoMo", "Airtel Money"] },
+  KE: { name: "Kenya", currency: "KES", operators: ["M-Pesa", "Airtel Money"] },
+  GH: { name: "Ghana", currency: "GHS", operators: ["MTN MoMo", "Vodafone Cash"] },
+  NG: { name: "Nigeria", currency: "NGN", operators: ["Bank transfer"] },
+};
+
 const labels: Record<string, string> = {
   XAF: "Franc CFA (CEMAC)", XOF: "Franc CFA (UEMOA)", CDF: "Franc congolais",
-  NGN: "Naira nigérian", RWF: "Franc rwandais", USD: "Dollar américain",
+  NGN: "Naira nigérian", RWF: "Franc rwandais", USD: "Dollar américain", KES: "Shilling kényan", GHS: "Cedi ghanéen",
 };
 const kinds: Record<string, string> = {
   collection: "Encaissement", withdrawal: "Retrait", conversion_in: "Conversion reçue",
@@ -32,8 +49,13 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
   const [open, setOpen] = useState<Action>(null);
   const [amount, setAmount] = useState("");
   const [toCurrency, setToCurrency] = useState("USD");
+  const [country, setCountry] = useState("");
+  const [operator, setOperator] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [noticeOk, setNoticeOk] = useState(false);
 
   async function load() {
     try {
@@ -58,9 +80,17 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoWithdraw, data]);
 
+  // Pays proposés : ceux qui utilisent la devise du portefeuille
+  const countriesFor = (currency: string) =>
+    Object.entries(DESTINATIONS).filter(([, d]) => d.currency === currency);
+
   function openAction(currency: string, mode: "withdraw" | "convert") {
     setOpen({ currency, mode });
     setAmount("");
+    setCountry("");
+    setOperator("");
+    setMobile("");
+    setName("");
     setNotice("");
   }
 
@@ -74,24 +104,50 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
     if (!open) return;
     setBusy(true);
     setNotice("");
-    const payload = open.mode === "withdraw"
-      ? { action: "withdraw", currency_code: open.currency, amount: Number(amount), app_id: appId }
-      : { action: "convert", from_currency: open.currency, to_currency: toCurrency.toUpperCase(), amount: Number(amount), app_id: appId };
     try {
-      const response = await fetch("/api/wallet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      let response: Response;
+      if (open.mode === "withdraw") {
+        // Retrait vers un mobile money : la demande part immédiatement pour les comptes vérifiés.
+        response = await fetch("/api/withdrawals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "schedule",
+            currency_code: open.currency,
+            amount: Number(amount),
+            destination: { country_code: country, operator, mobile, name },
+          }),
+        });
+      } else {
+        response = await fetch("/api/wallet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "convert",
+            from_currency: open.currency,
+            to_currency: toCurrency.toUpperCase(),
+            amount: Number(amount),
+            app_id: appId,
+          }),
+        });
+      }
+
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? "Demande refusée.");
+      if (!response.ok || result.ok === false) throw new Error(result.message ?? "Demande refusée.");
+
       const mode = open.mode;
       setOpen(null);
       setAmount("");
-      setNotice("Demande enregistrée. FlashPay la traite manuellement.");
+      setNoticeOk(true);
+      setNotice(
+        mode === "withdraw"
+          ? result.message ?? "Retrait enregistré."
+          : "Demande de conversion enregistrée."
+      );
       await load();
       onSubmitted?.(mode);
     } catch (e) {
+      setNoticeOk(false);
       setNotice(e instanceof Error ? e.message : "Demande refusée.");
     } finally {
       setBusy(false);
@@ -102,6 +158,8 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
   if (!data) return <p className="fp-muted">Chargement des portefeuilles…</p>;
 
   const minimum = (currency: string) => data.minimums.find((x) => x.currency_code === currency)?.minimum_amount;
+  const destinationOptions = open && open.mode === "withdraw" ? countriesFor(open.currency) : [];
+  const operatorOptions = country ? DESTINATIONS[country]?.operators ?? [] : [];
 
   return (
     <div className="fp-wallets">
@@ -136,7 +194,7 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
         ))}
       </div>
 
-      {notice && <p role="status" className="fp-notice">{notice}</p>}
+      {notice && <p role="status" className="fp-notice" style={noticeOk ? undefined : { background: "#fdecea", color: "#c8321a" }}>{notice}</p>}
 
       <article className="fp-card">
         <div className="fp-card-head">
@@ -174,6 +232,34 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
                   <input className="fp-input" placeholder="ex. USD" value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} required />
                 </label>
               )}
+
+              {open.mode === "withdraw" && (
+                <>
+                  <label className="fp-field">
+                    <span>Pays de réception</span>
+                    <select className="fp-input" value={country} onChange={(e) => { setCountry(e.target.value); setOperator(""); }} required>
+                      <option value="">Choisir un pays</option>
+                      {destinationOptions.map(([code, d]) => <option key={code} value={code}>{d.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="fp-field">
+                    <span>Opérateur mobile money</span>
+                    <select className="fp-input" value={operator} onChange={(e) => setOperator(e.target.value)} required disabled={!country}>
+                      <option value="">Choisir un opérateur</option>
+                      {operatorOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </label>
+                  <label className="fp-field">
+                    <span>Numéro qui recevra l’argent</span>
+                    <input className="fp-input" inputMode="tel" placeholder="ex. 812345678" value={mobile} onChange={(e) => setMobile(e.target.value)} required />
+                  </label>
+                  <label className="fp-field">
+                    <span>Nom du bénéficiaire</span>
+                    <input className="fp-input" placeholder="Nom complet" value={name} onChange={(e) => setName(e.target.value)} required />
+                  </label>
+                </>
+              )}
+
               <label className="fp-field">
                 <span>Montant en {open.currency}</span>
                 <input className="fp-input" inputMode="decimal" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
