@@ -6,11 +6,18 @@ import { createClient } from "@/lib/supabase/client";
 const plans = [
   { id: "none", name: "Sans abonnement", price: "", rate: "6 %", text: "Chaque encaissement est facturé 6 %. Aucun engagement." },
   { id: "basic", name: "Basic", price: "10 000 FCFA / mois", rate: "1 %", text: "1 % sur les encaissements mensuels jusqu’à 200 000 FCFA, puis 6 %." },
-  { id: "premium", name: "Premium", price: "20 000 FCFA / mois", rate: "1 %", text: "1 % jusqu’à 500 000 FCFA encaissés par mois, puis 6 %." },
+  { id: "premium", name: "Premium", price: "25 000 FCFA / mois", rate: "1 %", text: "1 % jusqu’à 500 000 FCFA encaissés par mois, puis 6 %." },
 ];
 const operators = [
-  { id: "MTN MoMo", icon: "📱" }, { id: "Orange Money", icon: "🟠" }, { id: "Moov Money", icon: "🔵" }, { id: "Wave", icon: "🌊" }, { id: "Airtel Money", icon: "🔴" },
+  { id: "MTN MoMo", icon: "📱" },
+  { id: "Orange Money", icon: "🟠" },
+  { id: "Moov Money", icon: "🔵" },
+  { id: "Wave", icon: "🌊" },
+  { id: "Airtel Money", icon: "🔴" },
 ];
+// Pays où Orange Money exige un code OTP
+const ORANGE_OTP_COUNTRIES = ["CI", "SN", "BF"];
+
 type Country = { code: string; name: string; currency_code: string };
 
 export default function SubscriptionsView({ plan }: { plan: string | null }) {
@@ -22,41 +29,98 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
   const [operator, setOperator] = useState("");
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
+  const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [msgOk, setMsgOk] = useState(false);
   const [done, setDone] = useState(false);
+  const [txId, setTxId] = useState("");
 
   useEffect(() => {
-    createClient().from("supported_countries").select("code,name,currency_code").order("name").then(({ data }) => {
-      if (data) setCountries((data as Country[]).filter((c) => c.currency_code === "XAF" || c.currency_code === "XOF"));
-    });
+    createClient()
+      .from("supported_countries")
+      .select("code,name,currency_code")
+      .order("name")
+      .then(({ data }) => {
+        if (data) setCountries((data as Country[]).filter((c) => c.currency_code === "XAF" || c.currency_code === "XOF"));
+      });
   }, []);
+
+  // Attente de la confirmation sur le téléphone : on interroge le serveur toutes les 4 secondes.
+  useEffect(() => {
+    if (!txId) return;
+    const timer = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/subscribe/status?tx=${encodeURIComponent(txId)}`, { cache: "no-store" });
+        const j = await r.json();
+        if (j.status === "successful") {
+          clearInterval(timer);
+          setTxId("");
+          setMsgOk(true);
+          setMessage("Paiement confirmé. Ton abonnement est actif.");
+        } else if (["failed", "cancelled", "expired"].includes(j.status)) {
+          clearInterval(timer);
+          setTxId("");
+          setDone(false);
+          setMsgOk(false);
+          setMessage("Le paiement n’a pas été confirmé. Tu peux réessayer.");
+        }
+      } catch {
+        // Erreur réseau ponctuelle : on réessaie au prochain tour.
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [txId]);
 
   const chosen = plans.find((p) => p.id === choice);
   const countryName = countries.find((c) => c.code === country)?.name ?? "";
+  const needsOtp = operator === "Orange Money" && ORANGE_OTP_COUNTRIES.includes(country);
 
-  function open(id: string) { setChoice(id); setStep(1); setMessage(""); setDone(false); }
-  function close() { setChoice(null); }
+  function open(id: string) {
+    setChoice(id);
+    setStep(1);
+    setMessage("");
+    setMsgOk(false);
+    setDone(false);
+    setTxId("");
+  }
+  function close() {
+    setChoice(null);
+  }
 
   function goNext() {
-    if (step === 1 && !country) { setMessage("Choisis ton pays."); return; }
-    if (step === 2 && !operator) { setMessage("Choisis ton opérateur."); return; }
-    if (step === 3 && (!name.trim() || !mobile.trim())) { setMessage("Indique ton nom et ton numéro."); return; }
-    setMessage(""); setStep((s) => s + 1);
+    if (step === 1 && !country) return setMessage("Choisis ton pays.");
+    if (step === 2 && !operator) return setMessage("Choisis ton opérateur.");
+    if (step === 3 && (!name.trim() || !mobile.trim())) return setMessage("Indique ton nom et ton numéro.");
+    if (step === 3 && needsOtp && !otp.trim()) return setMessage("Saisis le code OTP de ton compte Orange Money.");
+    setMessage("");
+    setStep((s) => s + 1);
   }
 
   async function pay() {
-    setBusy(true); setMessage("");
+    setBusy(true);
+    setMessage("");
+    setMsgOk(false);
     try {
       const response = await fetch("/api/subscribe", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: choice, country_code: country, mobile: mobile.trim(), payment_method: operator, name: name.trim() }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plan: choice,
+          country_code: country,
+          mobile: mobile.trim(),
+          payment_method: operator,
+          name: name.trim(),
+          otp: needsOtp ? otp.trim() : undefined,
+        }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Paiement impossible.");
-      if (result.data?.payment_link) { window.location.href = result.data.payment_link; return; }
+
+      setTxId(result.data.transaction_id);
       setDone(true);
-      setMessage("Valide le paiement sur ton téléphone avec ton code PIN. Ton abonnement s’active après confirmation.");
+      setMsgOk(true);
+      setMessage("Valide le paiement sur ton téléphone avec ton code PIN. Ton abonnement s’activera après confirmation.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Paiement impossible.");
     } finally {
@@ -112,7 +176,9 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
         @media (prefers-reduced-motion: reduce){.ck,.ck-back,.ck-step{animation:none}}
       `}</style>
 
-      <p className="dash-muted">Ton plan actuel : <b>{plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Sans abonnement"}</b></p>
+      <p className="dash-muted">
+        Ton plan actuel : <b>{plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Sans abonnement"}</b>
+      </p>
 
       {plans.map((p) => (
         <article key={p.id} className={`dash-card sub-card${p.id === current ? " on" : ""}`}>
@@ -121,7 +187,9 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
           <strong style={{ fontSize: 30 }}>{p.rate}</strong>
           <p className="dash-muted">{p.text}</p>
           {p.id === current && <span className="sub-badge">Plan actuel</span>}
-          {p.id !== "none" && p.id !== current && <button className="primary-button" onClick={() => open(p.id)}>Choisir {p.name}</button>}
+          {p.id !== "none" && p.id !== current && (
+            <button className="primary-button" onClick={() => open(p.id)}>Choisir {p.name}</button>
+          )}
         </article>
       ))}
 
@@ -132,7 +200,9 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
               <strong>Abonnement {chosen.name} · {chosen.price}</strong>
               <button className="ck-x" onClick={close} aria-label="Fermer">×</button>
             </div>
-            <div className="ck-dots">{[1, 2, 3, 4].map((n) => <span key={n} className={`ck-dot${n <= step ? " on" : ""}`} />)}</div>
+            <div className="ck-dots">
+              {[1, 2, 3, 4].map((n) => <span key={n} className={`ck-dot${n <= step ? " on" : ""}`} />)}
+            </div>
 
             {step === 1 && (
               <div className="ck-step" key="s1">
@@ -166,8 +236,20 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
               <div className="ck-step" key="s3">
                 <h2>Tes coordonnées</h2>
                 <p className="ck-sub">Le numéro qui recevra la demande de paiement.</p>
-                <div className="ck-field"><input id="ck-name" placeholder=" " value={name} onChange={(e) => setName(e.target.value)} /><label htmlFor="ck-name">Ton nom</label></div>
-                <div className="ck-field"><input id="ck-mob" placeholder=" " inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} /><label htmlFor="ck-mob">Ton numéro mobile</label></div>
+                <div className="ck-field">
+                  <input id="ck-name" placeholder=" " value={name} onChange={(e) => setName(e.target.value)} />
+                  <label htmlFor="ck-name">Ton nom</label>
+                </div>
+                <div className="ck-field">
+                  <input id="ck-mob" placeholder=" " inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} />
+                  <label htmlFor="ck-mob">Ton numéro mobile</label>
+                </div>
+                {needsOtp && (
+                  <div className="ck-field">
+                    <input id="ck-otp" placeholder=" " inputMode="numeric" value={otp} onChange={(e) => setOtp(e.target.value)} />
+                    <label htmlFor="ck-otp">Code OTP Orange Money</label>
+                  </div>
+                )}
               </div>
             )}
 
@@ -185,11 +267,15 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
               </div>
             )}
 
-            {message && <p className={done ? "ck-ok" : "ck-msg"} role="status">{message}</p>}
+            {message && <p className={msgOk ? "ck-ok" : "ck-msg"} role="status">{message}</p>}
 
             <div style={{ marginTop: 14 }}>
               {step < 4 && <button className="ck-btn" onClick={goNext}>Continuer</button>}
-              {step === 4 && !done && <button className="ck-btn" disabled={busy} onClick={() => void pay()}>{busy ? "Paiement…" : `Payer ${chosen.price}`}</button>}
+              {step === 4 && !done && (
+                <button className="ck-btn" disabled={busy} onClick={() => void pay()}>
+                  {busy ? "Paiement…" : `Payer ${chosen.price}`}
+                </button>
+              )}
               {done && <button className="ck-btn" onClick={close}>Terminé</button>}
             </div>
           </div>
