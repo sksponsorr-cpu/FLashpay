@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { notifyMerchant } from "@/lib/merchant-webhook";
 
-type PaymentLinkEvent = {
+type PaymentEvent = {
   event?: string;
   data?: {
     data?: {
@@ -19,83 +19,207 @@ type PaymentLinkEvent = {
 };
 
 export async function POST(request: Request) {
-  const secret = process.env.SWYCHR_WEBHOOK_SECRET;
-  const timestamp = request.headers.get("x-webhook-timestamp") ?? "";
-  const signature = request.headers.get("x-webhook-signature-v2") ?? "";
-
-  if (!secret) {
-    return NextResponse.json({ message: "Le secret webhook n’est pas configuré." }, { status: 503 });
-  }
-
-  const timestampSeconds = Number(timestamp);
-  const ageSeconds = Math.abs(Date.now() / 1000 - timestampSeconds);
-  if (!Number.isFinite(timestampSeconds) || ageSeconds > 300 || !/^[a-f0-9]{64}$/i.test(signature)) {
-    return NextResponse.json({ message: "Signature webhook invalide ou expirée." }, { status: 401 });
-  }
-
-  // Le corps brut doit être utilisé tel quel : la signature porte sur ces octets exacts.
-  const rawBody = await request.text();
-  const expected = createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest();
-  const received = Buffer.from(signature, "hex");
-
-  if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
-    return NextResponse.json({ message: "Signature webhook invalide." }, { status: 401 });
-  }
-
-  let event: PaymentLinkEvent;
   try {
-    event = JSON.parse(rawBody) as PaymentLinkEvent;
-  } catch {
-    return NextResponse.json({ message: "Corps webhook JSON invalide." }, { status: 400 });
-  }
+    // 1. Vérification du secret
+    const secret = process.env.SWYCHR_WEBHOOK_SECRET;
 
-  const attributes = event.data?.data?.attributes;
-  const amount = Number(attributes?.amount);
-  if (
-    event.event !== "payment_link_status_updated" ||
-    !attributes?.transaction_id ||
-    !attributes.status ||
-    !Number.isFinite(amount)
-  ) {
-    return NextResponse.json({ message: "Événement non reconnu." }, { status: 400 });
-  }
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
-    return NextResponse.json({ message: "La base n’est pas configurée pour les webhooks." }, { status: 503 });
-  }
-
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
-  });
-
-  const { data, error } = await admin.rpc("apply_swychr_payment_event", {
-    p_transaction_id: attributes.transaction_id,
-    p_provider_status: String(attributes.status),
-    p_amount: amount,
-    p_currency_code: attributes.currency_code ?? "",
-    p_swychr_reference: attributes.swychr_reference ?? null,
-  });
-
-  // En cas d'erreur de la base, on répond 503 : le prestataire renverra la notification plus tard.
-  if (error) {
-    return NextResponse.json({ message: "Notification reçue, mais enregistrement impossible. Nouvelle tentative attendue." }, { status: 503 });
-  }
-
-  // Notification au SaaS du développeur, une seule fois, au moment où le paiement devient « réussi ».
-  // Un échec d'envoi n'empêche pas de répondre 200 au prestataire.
-  // On relance aussi pour ALREADY_PROCESSED : si un envoi précédent a échoué après la mise à jour du statut,
-  // le crédit doit tout de même aboutir. Le crédit est idempotent (référence unique).
-  if (data === "SUCCESSFUL" || data === "ALREADY_PROCESSED") {
-    // Collecte : portefeuille crédité, net de la commission. Abonnement : pas d'activation automatique (à implémenter).
-    const { data: purpose, error: settleError } = await admin.rpc("settle_successful_transaction", {
-      p_transaction_id: attributes.transaction_id,
-    });
-    if (!settleError && purpose === "collection") {
-      await notifyMerchant(admin, attributes.transaction_id);
+    if (!secret) {
+      return NextResponse.json(
+        { message: "Secret webhook non configuré." },
+        { status: 503 }
+      );
     }
-  }
 
-  return NextResponse.json({ received: true, result: data }, { status: 200 });
+    // 2. Vérification de la signature
+    const timestamp =
+      request.headers.get("x-webhook-timestamp") ?? "";
+
+    const signature =
+      request.headers.get("x-webhook-signature-v2") ?? "";
+
+    const timestampSeconds = Number(timestamp);
+
+    const ageSeconds = Math.abs(
+      Date.now() / 1000 - timestampSeconds
+    );
+
+    if (
+      !Number.isFinite(timestampSeconds) ||
+      ageSeconds > 300 ||
+      !/^[a-f0-9]{64}$/i.test(signature)
+    ) {
+      return NextResponse.json(
+        { message: "Signature invalide ou expirée." },
+        { status: 401 }
+      );
+    }
+
+    // 3. Lire le corps brut
+    const rawBody = await request.text();
+
+    const expected = createHmac("sha256", secret)
+      .update(`${timestamp}.${rawBody}`)
+      .digest();
+
+    const received = Buffer.from(signature, "hex");
+
+    if (
+      received.length !== expected.length ||
+      !timingSafeEqual(received, expected)
+    ) {
+      return NextResponse.json(
+        { message: "Signature webhook incorrecte." },
+        { status: 401 }
+      );
+    }
+
+    // 4. Lire l'événement
+    let event: PaymentEvent;
+
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json(
+        { message: "JSON invalide." },
+        { status: 400 }
+      );
+    }
+
+    const attributes = event.data?.data?.attributes;
+
+    if (
+      event.event !== "payment_link_status_updated" ||
+      !attributes?.transaction_id ||
+      !attributes.status ||
+      attributes.amount === undefined
+    ) {
+      return NextResponse.json(
+        { message: "Événement non reconnu." },
+        { status: 400 }
+      );
+    }
+
+    const amount = Number(attributes.amount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json(
+        { message: "Montant invalide." },
+        { status: 400 }
+      );
+    }
+
+    // 5. Connexion Supabase sécurisée
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceKey) {
+      return NextResponse.json(
+        { message: "Configuration Supabase manquante." },
+        { status: 503 }
+      );
+    }
+
+    const admin = createClient(url, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    // 6. Enregistrer et valider le paiement
+    const { data, error } = await admin.rpc(
+      "apply_swychr_payment_event",
+      {
+        p_transaction_id: attributes.transaction_id,
+        p_provider_status: String(attributes.status).toLowerCase(),
+        p_amount: amount,
+        p_currency_code: attributes.currency_code ?? "",
+        p_swychr_reference:
+          attributes.swychr_reference ?? null,
+      }
+    );
+
+    if (error) {
+      console.error("Payment database error:", error);
+
+      return NextResponse.json(
+        { message: "Erreur d'enregistrement du paiement." },
+        { status: 503 }
+      );
+    }
+
+    // 7. Refuser les incohérences
+    if (
+      data === "UNKNOWN_TRANSACTION" ||
+      data === "AMOUNT_MISMATCH"
+    ) {
+      console.error("Payment validation failed:", {
+        transaction_id: attributes.transaction_id,
+        result: data,
+      });
+
+      return NextResponse.json(
+        { message: "Transaction non validée.", result: data },
+        { status: 400 }
+      );
+    }
+
+    // 8. Créditer uniquement les paiements confirmés
+    if (
+      data === "SUCCESSFUL" ||
+      data === "ALREADY_PROCESSED"
+    ) {
+      const { data: purpose, error: settleError } =
+        await admin.rpc(
+          "settle_successful_transaction",
+          {
+            p_transaction_id: attributes.transaction_id,
+          }
+        );
+
+      if (settleError) {
+        console.error("Settlement error:", settleError);
+
+        return NextResponse.json(
+          { message: "Crédit du portefeuille impossible." },
+          { status: 503 }
+        );
+      }
+
+      // Notification uniquement pour les encaissements.
+      if (purpose === "collection") {
+        try {
+          await notifyMerchant(
+            admin,
+            attributes.transaction_id
+          );
+        } catch (notificationError) {
+          console.error(
+            "Merchant notification error:",
+            notificationError
+          );
+        }
+      }
+
+      if (purpose === "subscription") {
+        console.info(
+          "Paiement abonnement confirmé :",
+          attributes.transaction_id
+        );
+      }
+    }
+
+    return NextResponse.json({
+      received: true,
+      result: data,
+    });
+
+  } catch (error) {
+    console.error("Webhook processing error:", error);
+
+    return NextResponse.json(
+      { message: "Erreur interne du webhook." },
+      { status: 500 }
+    );
+  }
 }
