@@ -1,21 +1,35 @@
 // Client serveur pour la création de demandes de paiement Swychr.
 // À utiliser uniquement côté serveur : la clé Api-Key ne doit jamais aller dans le navigateur.
 
-const CREATE_PAYMENT_REQUEST_URL = "https://api.accountpe.com/api/payin/create_payment_request";
+const CREATE_PAYMENT_REQUEST_URL = "https://api.accountpe.com/api/payin/create_payment_links";
 
-// Indicatifs pays : Swychr attend le numéro mobile SANS indicatif (exemple : 651791902).
+// Indicatifs pays : la documentation Swychr montre le numéro complet, avec indicatif (exemple : 237670000000).
 const DIAL_CODES: Record<string, string> = {
   CM: "237", CD: "243", CG: "242", SN: "221", BF: "226", BJ: "229", NG: "234",
   RW: "250", CI: "225", TG: "228", ML: "223", GH: "233", KE: "254",
 };
 
+// Numéro au format international : indicatif + numéro, sans 0 initial.
 export function localMobile(countryCode: string, mobile: string): string {
-  const digits = mobile.replace(/\D/g, "");
+  let digits = mobile.replace(/\D/g, "");
   const dial = DIAL_CODES[countryCode];
-  if (dial && digits.startsWith(dial) && digits.length > dial.length + 6) {
-    return digits.slice(dial.length);
-  }
-  return digits;
+  if (!dial) return digits;
+  if (digits.startsWith(dial)) return digits;
+  digits = digits.replace(/^0+/, "");
+  return dial + digits;
+}
+
+// Code de moyen de paiement attendu par Swychr (MTN, ORANGE...).
+// Seuls MTN et ORANGE sont confirmés par la documentation ; les autres sont à valider.
+export function swychrMethod(label: string): string {
+  const key = label.trim().toLowerCase();
+  if (key.includes("mtn")) return "MTN";
+  if (key.includes("orange")) return "ORANGE";
+  if (key.includes("moov")) return "MOOV";
+  if (key.includes("airtel")) return "AIRTEL";
+  if (key.includes("wave")) return "WAVE";
+  if (key.includes("m-pesa") || key.includes("mpesa")) return "MPESA";
+  return label.trim().toUpperCase();
 }
 
 export type PaymentRequestInput = {
