@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-type Link = { label: string; amount: number; currency_code: string; country_name: string; is_active: boolean };
+type Link = { label: string; amount: number; currency_code: string; country_name: string; is_active: boolean; mode: string };
 
 // Opérateurs proposés selon la devise du lien (à valider avec les opérateurs réellement activés).
 const operatorsByCurrency: Record<string, string[]> = {
@@ -95,7 +95,7 @@ function PayContent() {
         {!notFound && !link && <p className="pay-msg">Chargement…</p>}
         {link && !done && (
           <>
-            <span className="pay-test">Mode test · aucun paiement réel</span>
+            {link.mode === "test" && <span className="pay-test">Mode test · aucun paiement réel</span>}
             <h1>{link.label}</h1>
             <div className="pay-amount">{fmt(link.amount)} <small>{link.currency_code}</small></div>
             <p className="pay-country">{link.country_name}</p>
