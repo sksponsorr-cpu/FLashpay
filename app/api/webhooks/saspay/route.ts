@@ -1,170 +1,86 @@
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { randomBytes } from "node:crypto";
-import {
-  computeTotal,
-  createSwychrPaymentRequest,
-  internationalMobile,
-  resolvePaymentMethod,
-} from "@/lib/swychr";
-import { createSaspayPayment } from "@/lib/saspay";
-import { getActiveProvider } from "@/lib/payment-provider";
-import { liveGate } from "@/lib/live-gate";
+import { verifySaspaySignature } from "@/lib/saspay";
 
-function serviceClient() {
+// Événements SasPay -> statut attendu par la base FlashPay.
+const STATUS_BY_EVENT: Record<string, string> = {
+  "transaction.success": "successful",
+  "transaction.failed": "failed",
+  "transaction.cancelled": "cancelled",
+};
+
+export async function POST(request: Request) {
+  const secret = process.env.SASPAY_WEBHOOK_SECRET;
+  if (!secret) return NextResponse.json({ message: "Secret webhook SasPay non configuré." }, { status: 503 });
+
+  // Corps brut : la signature porte sur les octets exacts reçus.
+  const rawBody = await request.text();
+  const signature = request.headers.get("x-webhook-signature") ?? "";
+  const timestamp = request.headers.get("x-webhook-timestamp") ?? "";
+
+  if (!verifySaspaySignature(rawBody, signature, timestamp, secret)) {
+    return NextResponse.json({ message: "Signature invalide ou expirée." }, { status: 401 });
+  }
+
+  let payload: { event?: string; data?: Record<string, unknown> };
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ message: "JSON invalide." }, { status: 400 });
+  }
+
+  const event = request.headers.get("x-webhook-event") ?? payload.event ?? "";
+  const status = STATUS_BY_EVENT[event];
+  if (!status) return NextResponse.json({ received: true, ignored: true });
+
+  const data = payload.data ?? {};
+  const providerIds = [data["id"], data["reference"]].filter(
+    (value): value is string => typeof value === "string" && value.length > 0,
+  );
+  if (providerIds.length === 0) return NextResponse.json({ message: "Identifiant manquant." }, { status: 400 });
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return createSupabaseClient(url, key, {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return NextResponse.json({ message: "Configuration Supabase manquante." }, { status: 503 });
+
+  const admin = createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
-}
 
-export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const admin = serviceClient();
-  if (!admin) return NextResponse.json({ message: "Service indisponible." }, { status: 503 });
+  const { data: tx } = await admin
+    .from("transactions")
+    .select("transaction_id, currency_code")
+    .eq("provider", "saspay")
+    .in("provider_transaction_id", providerIds)
+    .maybeSingle();
 
-  let body: { name?: string; mobile?: string; operator?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ message: "Données invalides." }, { status: 400 });
-  }
+  if (!tx) return NextResponse.json({ message: "Transaction inconnue." }, { status: 404 });
 
-  const name = String(body.name ?? "").trim();
-  const mobile = String(body.mobile ?? "").trim();
-  const operator = String(body.operator ?? "").trim();
-
-  if (!name || !mobile || !operator) {
-    return NextResponse.json(
-      { message: "Choisis ton opérateur et indique ton nom et ton numéro." },
-      { status: 400 }
-    );
-  }
-
-  const { data: link } = await admin.from("payment_links").select("*").eq("token", token).maybeSingle();
-
-  if (!link) return NextResponse.json({ message: "Ce lien de paiement n’existe pas." }, { status: 404 });
-  if (!link.is_active) return NextResponse.json({ message: "Ce lien n’est plus actif." }, { status: 409 });
-
-  // Mode test : simulation, aucun argent réel
-  if (link.mode === "test") {
-    const { error } = await admin.rpc("pay_payment_link", {
-      p_token: token,
-      p_name: name,
-      p_mobile: mobile,
-      p_operator: operator,
-    });
-    if (error) {
-      return NextResponse.json({ message: "Le paiement de test n’a pas pu être enregistré." }, { status: 400 });
-    }
-    return NextResponse.json({
-      status: "paid",
-      mode: "test",
-      message: "Paiement de test enregistré. Aucun argent réel n’a été débité.",
-    });
-  }
-
-  // Mode live : vérification stricte avant tout appel au prestataire
-  const gate = await liveGate(admin, link.owner_id);
-  if (!gate.ok) return NextResponse.json({ message: gate.message }, { status: 403 });
-
-  const provider = await getActiveProvider(admin);
-  const amount = Number(link.amount);
-  const total = computeTotal(amount, link.country_code, true);
-  // Frais FlashPay existants, calculés sur le montant du lien.
-  const fee = Math.round(amount * 0.06 * 100) / 100;
-  const transactionId = `FP-${randomBytes(8).toString("hex").toUpperCase()}`;
-  const apiKey = provider === "saspay" ? process.env.SASPAY_API_KEY ?? "" : process.env.SWYCHR_API_KEY ?? "";
-
-  const paymentMethod =
-    provider === "swychr" ? await resolvePaymentMethod(link.country_code, operator, apiKey) : operator;
-
-  // Transaction enregistrée avant l'appel au prestataire.
-  // amount = total payé par le client (frais inclus), pour que le webhook corresponde.
-  const { error: insertError } = await admin.from("transactions").insert({
-    owner_id: link.owner_id,
-    app_id: link.app_id,
-    transaction_id: transactionId,
-    country_code: link.country_code,
-    payment_method: paymentMethod,
-    amount: total,
-    currency_code: link.currency_code,
-    processing_fee: fee,
-    net_payable: Math.round((amount - fee) * 100) / 100,
-    status: "pending",
-    provider,
+  // charged = ce que le client a réellement débité (frais inclus selon fee_charge_mode).
+  const charged = Number(data["charged"] ?? data["amount"]);
+  const { data: result, error } = await admin.rpc("apply_swychr_payment_event", {
+    p_transaction_id: tx.transaction_id,
+    p_provider_status: status,
+    p_amount: charged,
+    p_currency_code: typeof data["currency"] === "string" ? data["currency"] : tx.currency_code,
+    p_swychr_reference: typeof data["reference"] === "string" ? data["reference"] : null,
   });
 
-  if (insertError) {
-    return NextResponse.json({ message: "Le paiement n’a pas pu être préparé." }, { status: 500 });
+  if (error) {
+    console.error("[saspay webhook] rpc", error);
+    return NextResponse.json({ message: "Erreur d'enregistrement." }, { status: 503 });
+  }
+  if (result === "UNKNOWN_TRANSACTION" || result === "AMOUNT_MISMATCH") {
+    console.error("[saspay webhook] refusé", { transaction_id: tx.transaction_id, result, charged });
+    return NextResponse.json({ message: "Transaction non validée.", result }, { status: 400 });
   }
 
-  const markFailed = () =>
-    admin.from("transactions").update({ status: "failed" }).eq("transaction_id", transactionId);
-
-  // --- SasPay : paiement direct, le client reste sur FlashPay ---
-  if (provider === "saspay") {
-    const result = await createSaspayPayment(
-      {
-        amount: total,
-        currency: link.currency_code,
-        countryCode: link.country_code,
-        operatorLabel: operator,
-        description: link.label,
-        name,
-        email: process.env.SASPAY_DEFAULT_EMAIL ?? "paiements@flashpay.app",
-        phone: internationalMobile(link.country_code, mobile),
-      },
-      apiKey
-    );
-
-    if (!result.ok) {
-      await markFailed();
-      return NextResponse.json({ message: result.message }, { status: 502 });
-    }
-
-    if (result.providerId || result.reference) {
-      await admin
-        .from("transactions")
-        .update({ provider_transaction_id: result.providerId ?? result.reference })
-        .eq("transaction_id", transactionId);
-    }
-
-    return NextResponse.json({
-      status: "pending",
-      mode: "live",
-      transaction_id: transactionId,
-      message: "Valide le paiement sur ton téléphone avec ton code PIN.",
+  if (status === "successful" && (result === "SUCCESSFUL" || result === "ALREADY_PROCESSED")) {
+    const { error: settleError } = await admin.rpc("settle_successful_transaction", {
+      p_transaction_id: tx.transaction_id,
     });
+    if (settleError) console.error("[saspay webhook] settlement", settleError);
   }
 
-  // --- Swychr : lien hébergé, le client est redirigé ---
-  const result = await createSwychrPaymentRequest(
-    {
-      country_code: link.country_code,
-      name,
-      mobile,
-      transaction_id: transactionId,
-      amount,
-      payment_method: paymentMethod,
-      description: link.label,
-      clientFee: true,
-    },
-    apiKey
-  );
-
-  if (!result.ok) {
-    await markFailed();
-    return NextResponse.json({ message: result.message }, { status: 502 });
-  }
-
-  return NextResponse.json({
-    status: "pending",
-    mode: "live",
-    transaction_id: transactionId,
-    payment_link: result.paymentLink,
-    message: "Redirection vers la page de validation de ton opérateur.",
-  });
+  return NextResponse.json({ received: true, result });
 }
