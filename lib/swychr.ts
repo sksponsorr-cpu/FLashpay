@@ -3,7 +3,7 @@
 // Ne jamais exposer la clé API au navigateur.
 
 const CREATE_PAYMENT_REQUEST_URL =
-  "https://api.accountpe.com/api/payin/create_payment_links";
+  "https://api.accountpe.com/api/payin/create_payment_request";
 
 const DIAL_CODES: Record<string, string> = {
   CM: "237",
