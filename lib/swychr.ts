@@ -1,6 +1,6 @@
-// FLASH PAY — ACCOUNTPE / SWYCHR
-// Communication serveur avec le prestataire de paiement.
-// Ne jamais exposer la clé API au navigateur.
+// FLASH PAY — ACCOUNTPE / SWYCHR — API Direct (create_payment_request)
+// Serveur uniquement. Ne jamais exposer la clé API au navigateur.
+// Le client reste sur FlashPay : il valide le paiement sur son téléphone (push).
 
 const CREATE_PAYMENT_REQUEST_URL =
   "https://api.accountpe.com/api/payin/create_payment_request";
@@ -21,23 +21,27 @@ const DIAL_CODES: Record<string, string> = {
   KE: "254",
 };
 
-// Normalisation des numéros internationaux.
-export function localMobile(
-  countryCode: string,
-  mobile: string
-): string {
+// Numéro au format national, sans indicatif (format attendu par l'API Direct).
+export function nationalMobile(countryCode: string, mobile: string): string {
   let digits = mobile.replace(/\D/g, "");
+  const dialCode = DIAL_CODES[countryCode.toUpperCase()];
 
+  if (dialCode && digits.startsWith(dialCode)) {
+    digits = digits.slice(dialCode.length);
+  }
+
+  return digits.replace(/^0+/, "");
+}
+
+// Conservé pour les routes qui utilisent encore l'ancien format (ex. collect).
+export function localMobile(countryCode: string, mobile: string): string {
+  let digits = mobile.replace(/\D/g, "");
   const dialCode = DIAL_CODES[countryCode.toUpperCase()];
 
   if (!dialCode) return digits;
-
-  if (digits.startsWith(dialCode)) {
-    return digits;
-  }
+  if (digits.startsWith(dialCode)) return digits;
 
   digits = digits.replace(/^0+/, "");
-
   return `${dialCode}${digits}`;
 }
 
@@ -64,6 +68,14 @@ export function swychrMethod(label: string): string {
   return methods[key] ?? label.trim().toUpperCase();
 }
 
+// Orange Money exige un code OTP dans ces pays (sinon l'API répond 400).
+export function requiresOtp(countryCode: string, paymentMethod: string): boolean {
+  return (
+    paymentMethod === "ORANGE" &&
+    ["CI", "SN", "BF"].includes(countryCode.toUpperCase())
+  );
+}
+
 export type PaymentRequestInput = {
   country_code: string;
   name: string;
@@ -74,14 +86,17 @@ export type PaymentRequestInput = {
   payment_method: string;
   description: string;
   pass_digital_charge: boolean;
+  otp?: string;
   callback_url?: string;
   failed_callback_url?: string;
 };
 
+// Le paiement se valide sur le téléphone du client : il n'y a plus de lien à ouvrir.
+// paymentLink est conservé à null pour compatibilité avec les anciennes routes.
 export type PaymentRequestResult =
   | {
       ok: true;
-      paymentLink: string | null;
+      paymentLink: null;
       swychrReference: string | null;
     }
   | {
@@ -94,89 +109,46 @@ export async function createSwychrPaymentRequest(
   apiKey: string
 ): Promise<PaymentRequestResult> {
   if (!apiKey) {
-    return {
-      ok: false,
-      message: "Clé API AccountPe manquante.",
-    };
+    return { ok: false, message: "Clé API AccountPe manquante." };
   }
 
   try {
-    const response = await fetch(
-      CREATE_PAYMENT_REQUEST_URL,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-          "Api-Key": apiKey,
-          Accept: "application/json",
-        },
-
-        body: JSON.stringify(input),
-
-        cache: "no-store",
-
-        signal: AbortSignal.timeout(30000),
-      }
-    );
+    const response = await fetch(CREATE_PAYMENT_REQUEST_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Api-Key": apiKey,
+        Accept: "application/json",
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+      signal: AbortSignal.timeout(30000),
+    });
 
     const result = await response.json().catch(() => null);
 
     if (!response.ok || !result) {
-      console.error(
-        "AccountPe HTTP error:",
-        response.status,
-        result?.message
-      );
+      console.error("AccountPe HTTP error:", response.status, result?.message);
 
       return {
         ok: false,
-        message:
-          result?.message ??
-          `Erreur AccountPe HTTP ${response.status}.`,
+        message: result?.message ?? `Erreur AccountPe HTTP ${response.status}.`,
       };
     }
 
-    if (
-      result.status !== 200 &&
-      result.status !== "200"
-    ) {
+    if (result.status !== 200 && result.status !== "200") {
       return {
         ok: false,
-        message:
-          result.message ??
-          "AccountPe a refusé la demande de paiement.",
+        message: result.message ?? "AccountPe a refusé la demande de paiement.",
       };
     }
 
     const data = result.data ?? {};
 
-    const paymentLink =
-      data.payment_link ??
-      data.payment_url ??
-      data.checkout_url ??
-      result.payment_link ??
-      result.payment_url ??
-      result.checkout_url ??
-      null;
-
-    const swychrReference =
-      data.swychr_reference ??
-      data.reference ??
-      data.id ??
-      null;
-
     return {
       ok: true,
-      paymentLink:
-        typeof paymentLink === "string"
-          ? paymentLink
-          : null,
-
-      swychrReference:
-        swychrReference !== null
-          ? String(swychrReference)
-          : null,
+      paymentLink: null,
+      swychrReference: data.id != null ? String(data.id) : null,
     };
   } catch (error) {
     console.error("AccountPe connection error:", error);
@@ -184,10 +156,9 @@ export async function createSwychrPaymentRequest(
     return {
       ok: false,
       message:
-        error instanceof Error &&
-        error.name === "TimeoutError"
+        error instanceof Error && error.name === "TimeoutError"
           ? "Le prestataire AccountPe met trop de temps à répondre."
           : "Impossible de contacter AccountPe.",
     };
   }
-  }
+}
