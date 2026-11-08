@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { getActiveProvider } from "@/lib/payment-provider";
 import { Rocket, KeyRound, Bell, ShieldCheck, Globe, Percent, AlertTriangle, Search, Menu, Zap, PlusCircle, LayoutDashboard, Code2, ChevronDown } from "lucide-react";
 
 export const metadata = {
@@ -87,6 +89,17 @@ td code{background:#1d1f29;color:#ffb199;padding:1px 6px;border-radius:6px}
 section{scroll-margin-top:80px}
 `;
 
+// Fournisseur actif : détermine la forme de la réponse de création de collecte.
+async function currentProvider() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return "swychr" as const;
+  const admin = createSupabaseClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+  });
+  return getActiveProvider(admin);
+}
+
 async function getBackHref() {
   try {
     const supabase = await createClient();
@@ -99,6 +112,7 @@ async function getBackHref() {
 
 async function ApiDocumentationContent() {
   const backHref = await getBackHref();
+  const direct = (await currentProvider()) === "saspay";
   return (
     <main className="fp-docs">
       <style>{css}</style>
@@ -167,6 +181,11 @@ async function ApiDocumentationContent() {
               <tr><td><code>payment_method</code></td><td>Selon le mode</td><td>Moyen de paiement disponible dans le pays concerné.</td></tr>
               <tr><td><code>transaction_id</code></td><td>Non</td><td>Référence unique de ta commande.</td></tr>
             </tbody></table></div>
+            {direct ? (
+              <div className="fp-docs-note"><strong>Paiement direct.</strong> Le client reste sur ta page et valide la demande avec son code PIN sur son téléphone. La réponse ne contient pas de lien de redirection : suis le statut de la transaction grâce aux notifications de paiement.</div>
+            ) : (
+              <div className="fp-docs-note"><strong>Redirection.</strong> La réponse contient <code className="fp-docs-inline">payment_link</code>. Redirige le client vers cette adresse pour qu’il finalise le paiement.</div>
+            )}
             <h3>Exemple côté serveur</h3>
             <div className="fp-docs-code"><div className="fp-docs-code-head">JavaScript · serveur</div><pre>{`const response = await fetch("/api/v1/collections", {
   method: "POST",
