@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import PaymentProviderSwitch from "@/components/admin/payment-provider-switch";
 
 type Withdrawal = { id: string; currency_code: string; requested_amount: number; payout_amount: number; fee_amount: number; destination_details?: unknown; destination_name?: string | null; destination_country?: string | null; destination_operator?: string | null; destination_mobile?: string | null; created_at: string };
 type Conversion = { id: string; from_currency: string; to_currency: string; amount: number; fee_rate?: number; created_at: string };
@@ -112,6 +113,8 @@ export default function AdminPage() {
 
       {error && <p className="adm-err">{error}</p>}
       {notice && <div className="adm-note" role="status">{notice}</div>}
+
+      <div style={{ margin: "14px 0" }}><PaymentProviderSwitch /></div>
 
       <nav className="adm-tabs" role="tablist">
         {tabs.map((t) => (
