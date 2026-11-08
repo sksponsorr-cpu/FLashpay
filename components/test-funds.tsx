@@ -2,24 +2,28 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-// Ajout de fonds de TEST : visible uniquement quand une clé test existe pour l'application.
+// Ajout de fonds de TEST : visible uniquement pour un compte NON vérifié.
 // Aucun argent réel n'est impliqué.
 type Country = { code: string; name: string; currency_code: string };
 
 export default function TestFunds({ appId }: { appId: string }) {
+  const [checked, setChecked] = useState(false); // statut du compte connu ?
+  const [verified, setVerified] = useState(false);
   const [countries, setCountries] = useState<Country[]>([]);
   const [country, setCountry] = useState("CM");
   const [amount, setAmount] = useState("5000");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [verified, setVerified] = useState(false);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       const supabase = createClient();
-      const { data: prof } = await supabase.from("profiles").select("verification_status").single();
-      if (alive) setVerified(prof?.verification_status === "verified");
+      const { data: prof } = await supabase.from("profiles").select("verification_status").maybeSingle();
+      if (!alive) return;
+      setVerified(prof?.verification_status === "verified");
+      setChecked(true);
+      if (prof?.verification_status === "verified") return;
       const { data } = await supabase.from("supported_countries").select("code,name,currency_code").order("name");
       if (alive && data) setCountries(data as Country[]);
     })();
@@ -42,7 +46,8 @@ export default function TestFunds({ appId }: { appId: string }) {
     }
   }
 
-  if (verified) return null; // compte vérifié : plus de fonds de test
+  // Tant que le statut n'est pas connu, on n'affiche rien : évite le clignotement.
+  if (!checked || verified) return null;
 
   return (
     <section className="dash-card test-funds">
