@@ -2,7 +2,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getSupportedCountry } from "@/lib/countries";
-import { createSwychrPaymentRequest, localMobile } from "@/lib/swychr";
+import { createSwychrPaymentRequest, internationalMobile, localMobile } from "@/lib/swychr";
+import { createSaspayPayment } from "@/lib/saspay";
+import { getActiveProvider } from "@/lib/payment-provider";
 
 const RATE_LIMIT_PER_MINUTE = 60;
 
@@ -45,10 +47,13 @@ export async function POST(request: Request) {
 
   // Limite de requêtes par clé (contrôle réservé au serveur, avec la clé service role).
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (serviceKey) {
-    const admin = createSupabaseClient(url, serviceKey, {
-      auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
-    });
+  const admin = serviceKey
+    ? createSupabaseClient(url, serviceKey, {
+        auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+      })
+    : null;
+
+  if (admin) {
     const { data: allowed, error: rateError } = await admin.rpc("check_api_rate_limit", {
       p_key_hash: keyHash,
       p_limit: RATE_LIMIT_PER_MINUTE,
@@ -112,7 +117,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Cet identifiant de transaction est déjà utilisé." }, { status: 409 });
   }
 
-  // Collecte test : aucun appel à Swychr.
+  // Collecte test : aucun appel au prestataire.
   if (!isLive) {
     return NextResponse.json({
       mode: "test",
@@ -125,12 +130,65 @@ export async function POST(request: Request) {
         status: record.out_status,
         platform_fee: record.out_platform_fee,
         net_payable: record.out_net_payable,
-        message: "Collecte de test enregistrée. Aucun appel à Swychr et aucun mouvement de fonds n’ont eu lieu.",
+        message: "Collecte de test enregistrée. Aucun appel au prestataire et aucun mouvement de fonds n’ont eu lieu.",
       },
     });
   }
 
-  // Collecte live : création de la demande de paiement chez Swychr.
+  // Collecte live : fournisseur actif (Swychr ou SasPay).
+  const provider = admin ? await getActiveProvider(admin) : "swychr";
+  const paymentMethod = body.payment_method!.trim().toUpperCase();
+  const description = body.description?.trim() || "Collecte FlashPay";
+
+  if (provider === "saspay") {
+    // Paiement direct : le payeur valide sur son téléphone, sans lien de redirection.
+    // Le montant envoyé est exactement celui demandé ; les frais sont réglés selon le réglage SasPay (DEDUCTED).
+    const apiKey = process.env.SASPAY_API_KEY;
+    if (!apiKey) return NextResponse.json({ message: "La clé de paiement SasPay n’est pas configurée." }, { status: 503 });
+
+    const result = await createSaspayPayment(
+      {
+        amount,
+        currency: country.currency,
+        countryCode: country.code,
+        operatorLabel: paymentMethod,
+        description,
+        name: body.name.trim(),
+        email: body.email?.trim() || process.env.SASPAY_DEFAULT_EMAIL || "paiements@flashpay.app",
+        phone: internationalMobile(country.code, body.mobile),
+      },
+      apiKey,
+    );
+
+    if (!result.ok) {
+      return NextResponse.json({ message: result.message }, { status: 502 });
+    }
+
+    // Retrouve la transaction par son identifiant chez SasPay pour recevoir la notification.
+    if (admin && (result.providerId || result.reference)) {
+      await admin
+        .from("transactions")
+        .update({ provider: "saspay", provider_transaction_id: result.providerId ?? result.reference })
+        .eq("transaction_id", record.out_transaction_id);
+    }
+
+    return NextResponse.json({
+      mode: "live",
+      data: {
+        transaction_id: record.out_transaction_id,
+        country_code: country.code,
+        currency_code: country.currency,
+        amount,
+        payment_method: paymentMethod,
+        status: record.out_status,
+        platform_fee: record.out_platform_fee,
+        net_payable: record.out_net_payable,
+        message: "Demande envoyée. Le client valide le paiement avec son code PIN sur son téléphone.",
+      },
+    });
+  }
+
+  // Swychr : lien hébergé, le client est redirigé.
   const swychrKey = process.env.SWYCHR_API_KEY;
   if (!swychrKey) {
     return NextResponse.json({ message: "La clé de paiement serveur n’est pas configurée." }, { status: 503 });
@@ -144,12 +202,11 @@ export async function POST(request: Request) {
       mobile: localMobile(country.code, body.mobile),
       transaction_id: record.out_transaction_id,
       amount,
-      payment_method: body.payment_method!.trim().toUpperCase(),
-      description: body.description?.trim() || "Collecte FlashPay",
-      // Par défaut, les frais Swychr (2,5 %) sont payés par le payeur.
-      pass_digital_charge: body.pass_digital_charge !== false,
-      callback_url: body.callback_url?.trim() || undefined,
-      failed_callback_url: body.failed_callback_url?.trim() || undefined,
+      payment_method: paymentMethod,
+      description,
+      // Montant exact enregistré pour le marchand : aucun frais ajouté au montant envoyé,
+      // pour que le webhook corresponde à la transaction enregistrée.
+      clientFee: false,
     },
     swychrKey,
   );
@@ -166,7 +223,7 @@ export async function POST(request: Request) {
       country_code: country.code,
       currency_code: country.currency,
       amount,
-      payment_method: body.payment_method!.trim().toUpperCase(),
+      payment_method: paymentMethod,
       status: record.out_status,
       platform_fee: record.out_platform_fee,
       net_payable: record.out_net_payable,
