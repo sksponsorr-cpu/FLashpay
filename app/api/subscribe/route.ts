@@ -2,12 +2,7 @@ import { randomBytes } from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getSupportedCountry } from "@/lib/countries";
-import {
-  createSwychrPaymentRequest,
-  nationalMobile,
-  requiresOtp,
-  swychrMethod,
-} from "@/lib/swychr";
+import { createSwychrPaymentRequest, resolvePaymentMethod } from "@/lib/swychr";
 import { createClient } from "@/lib/supabase/server";
 
 const PLANS: Record<string, { amount: number; label: string }> = {
@@ -21,7 +16,6 @@ type SubscribeBody = {
   mobile?: string;
   payment_method?: string;
   name?: string;
-  otp?: string;
 };
 
 export async function POST(request: Request) {
@@ -37,7 +31,6 @@ export async function POST(request: Request) {
   }
 
   let body: SubscribeBody;
-
   try {
     body = await request.json();
   } catch {
@@ -45,14 +38,9 @@ export async function POST(request: Request) {
   }
 
   const plan = body.plan ? PLANS[body.plan] : undefined;
+  if (!plan) return NextResponse.json({ message: "Plan Basic ou Premium invalide." }, { status: 400 });
 
-  if (!plan) {
-    return NextResponse.json({ message: "Plan Basic ou Premium invalide." }, { status: 400 });
-  }
-
-  const countryCode = body.country_code?.trim().toUpperCase();
-  const country = getSupportedCountry(countryCode);
-
+  const country = getSupportedCountry(body.country_code?.trim().toUpperCase());
   if (!country || !["XAF", "XOF"].includes(country.currency)) {
     return NextResponse.json(
       { message: "Les abonnements sont disponibles uniquement en FCFA." },
@@ -62,16 +50,6 @@ export async function POST(request: Request) {
 
   if (!body.mobile?.trim() || !body.payment_method?.trim()) {
     return NextResponse.json({ message: "Numéro et opérateur obligatoires." }, { status: 400 });
-  }
-
-  const paymentMethod = swychrMethod(body.payment_method);
-  const otp = body.otp?.trim() ?? "";
-
-  if (requiresOtp(country.code, paymentMethod) && !otp) {
-    return NextResponse.json(
-      { message: "Saisis le code OTP de ton compte Orange Money." },
-      { status: 400 }
-    );
   }
 
   const apiKey = process.env.SWYCHR_API_KEY;
@@ -87,15 +65,10 @@ export async function POST(request: Request) {
   });
 
   const transactionId = `SUB-${randomBytes(8).toString("hex").toUpperCase()}`;
+  const paymentMethod = await resolvePaymentMethod(country.code, body.payment_method, apiKey);
 
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const payerName =
-    body.name?.trim() || profile?.full_name?.trim() || user.email || "Client FlashPay";
+  const { data: profile } = await admin.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  const payerName = body.name?.trim() || profile?.full_name?.trim() || user.email || "Client FlashPay";
 
   const { error: txError } = await admin.from("transactions").insert({
     owner_id: user.id,
@@ -133,13 +106,12 @@ export async function POST(request: Request) {
       country_code: country.code,
       name: payerName,
       email: user.email || undefined,
-      mobile: nationalMobile(country.code, body.mobile),
+      mobile: body.mobile,
       transaction_id: transactionId,
       amount: plan.amount,
       payment_method: paymentMethod,
       description: `Abonnement FlashPay ${plan.label}`,
-      pass_digital_charge: true,
-      otp: otp || undefined,
+      clientFee: false,
     },
     apiKey
   );
@@ -147,7 +119,6 @@ export async function POST(request: Request) {
   if (!paymentRequest.ok) {
     await admin.from("transactions").update({ status: "failed" }).eq("transaction_id", transactionId);
     await admin.from("subscription_payments").update({ status: "failed" }).eq("transaction_id", transactionId);
-
     return NextResponse.json({ message: paymentRequest.message }, { status: 502 });
   }
 
@@ -158,7 +129,7 @@ export async function POST(request: Request) {
       plan: body.plan,
       amount: plan.amount,
       currency: country.currency,
-      status: "pending",
+      payment_link: paymentRequest.paymentLink,
     },
   });
 }
