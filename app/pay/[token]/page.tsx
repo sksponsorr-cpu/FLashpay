@@ -83,7 +83,7 @@ html,body{background:#f4f2ff}
 .pg-field label{position:absolute;left:14px;top:20px;color:#6b6c80;font-size:15px;pointer-events:none;transition:all .25s ease}
 .pg-field input:focus + label,.pg-field input:not(:placeholder-shown) + label{top:8px;font-size:11px;color:#5b3fd6;font-weight:700}
 .pg-prefix{display:flex;align-items:center;gap:8px;margin-top:14px;padding:0 14px;min-height:58px;border:1px solid #ebe8f7;border-radius:16px;background:#fbfaff}
-.pg-prefix span{font-weight:800;color:#5b3fd6}
+.pg-rule{margin-top:12px;padding:12px 14px;border-radius:14px;background:#f4f1ff;font-size:13px;color:#3d3560}.pg-rule ul{margin:6px 0 0;padding-left:18px}.pg-rule li{margin:2px 0}
 .pg-prefix input{flex:1;border:0;background:transparent;font:inherit;font-size:16px;padding:14px 0;outline:none}
 .pg-recap{display:grid;gap:0;border-radius:18px;background:#fbfaff;padding:6px 14px;margin:6px 0 16px}
 .pg-recap div{display:flex;justify-content:space-between;gap:10px;padding:12px 0;border-top:1px solid #ebe8f7;font-size:14px}
@@ -153,6 +153,11 @@ function PayContent() {
     if (step === 1 && !link?.is_active) { setMsg("Ce lien n’est plus actif."); return; }
     if (step === 2 && !network) { setMsg("Choisis ton moyen de paiement."); return; }
     if (step === 3 && (!mobile.trim() || !name.trim())) { setMsg("Indique ton nom et ton numéro."); return; }
+    if (step === 3) {
+      const compact = mobile.replace(/[\s-]/g, "");
+      if (compact.includes("+")) { setMsg("Ne mets pas le + : écris ton numéro sans indicatif du pays."); return; }
+      if (!/^\d{8,12}$/.test(compact)) { setMsg("Ton numéro doit contenir uniquement des chiffres (8 à 12)."); return; }
+    }
     setMsg("");
     setStep((s) => s + 1);
   }
@@ -164,7 +169,7 @@ function PayContent() {
       const response = await fetch(`/api/pay/${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), mobile: (dial.code + mobile).trim(), operator: network }),
+        body: JSON.stringify({ name: name.trim(), mobile: mobile.replace(/[\s-]/g, ""), operator: network }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Le paiement n’a pas pu être effectué.");
@@ -279,10 +284,16 @@ function PayContent() {
                   <label htmlFor="pg-name">Ton nom complet</label>
                 </div>
                 <div className="pg-prefix">
-                  <span>{dial.code || "+"}</span>
                   <input inputMode="tel" placeholder="Ton numéro mobile" value={mobile} onChange={(e) => setMobile(e.target.value)} />
                 </div>
-                {dial.label && <p className="pg-fee" style={{ marginTop: 8 }}>Numéro {dial.label} : {dial.code} suivi de ton numéro.</p>}
+                <div className="pg-rule">
+                  <strong>Comment écrire ton numéro</strong>
+                  <ul>
+                    <li>Écris-le comme tu le composes dans ton pays.</li>
+                    <li>Ne mets pas le signe + et n’ajoute pas l’indicatif du pays (ex. +243).</li>
+                    <li>Garde le 0 du début s’il fait partie de ton numéro (ex. Bénin : 0197505050).</li>
+                  </ul>
+                </div>
               </div>
             )}
 
@@ -294,7 +305,7 @@ function PayContent() {
                   <div><span>Montant</span><strong>{fmt(link.amount)} {link.currency_code}</strong></div>
                   <div><span>Frais</span><strong>+{fmt(fee)} {link.currency_code}</strong></div>
                   <div><span>Moyen</span><strong>{network}</strong></div>
-                  <div><span>Numéro</span><strong>{dial.code}{mobile}</strong></div>
+                  <div><span>Numéro</span><strong>{mobile}</strong></div>
                   <div><span>Total à payer</span><strong className="pg-total">{fmt(total)} {link.currency_code}</strong></div>
                 </div>
               </div>
