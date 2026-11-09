@@ -8,8 +8,9 @@ import {
   resolvePaymentMethod,
 } from "@/lib/swychr";
 import { createSaspayPayment } from "@/lib/saspay";
-import { getActiveProvider } from "@/lib/payment-provider";
+import { routeProvider } from "@/lib/payment-routing";
 import { liveGate } from "@/lib/live-gate";
+import { minimumFor } from "@/lib/payment-minimums";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -70,9 +71,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   const gate = await liveGate(admin, link.owner_id);
   if (!gate.ok) return NextResponse.json({ message: gate.message }, { status: 403 });
 
-  const provider = await getActiveProvider(admin);
+  const provider = routeProvider(link.country_code); // automatique par pays
   const amount = Number(link.amount);
   const total = computeTotal(amount, link.country_code, true);
+
+  // Montant minimum par devise, vérifié avant tout appel au prestataire
+  const { data: countryRow } = await admin.from("supported_countries").select("currency_code").eq("code", link.country_code).maybeSingle();
+  const currency = countryRow?.currency_code ?? link.currency_code;
+  const min = minimumFor(currency);
+  if (min !== null && total < min) {
+    return NextResponse.json(
+      { message: `Montant trop faible : le minimum est de ${min} ${currency} (frais inclus).` },
+      { status: 400 }
+    );
+  }
   // Frais FlashPay existants, calculés sur le montant du lien.
   const fee = Math.round(amount * 0.06 * 100) / 100;
   const transactionId = `FP-${randomBytes(8).toString("hex").toUpperCase()}`;
