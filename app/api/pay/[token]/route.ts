@@ -115,7 +115,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
         description: link.label,
         name,
         email: process.env.SASPAY_DEFAULT_EMAIL ?? "paiements@flashpay.app",
-        phone: internationalMobile(link.country_code, mobile),
+        phone: mobile, // numéro tel que saisi : la conversion se fait dans lib/saspay.ts
       },
       apiKey
     );
