@@ -1,7 +1,7 @@
 // FLASH PAY — SASPAY — paiement direct (softpay) et vérification des webhooks.
 // Serveur uniquement : SASPAY_API_KEY ne doit jamais être exposée au navigateur.
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { resolveSaspayNetwork } from "@/lib/saspay-networks";
+import { describeNetworks, resolveSaspayNetwork } from "@/lib/saspay-networks";
 
 const BASE_URL = "https://api.saspay.me/api/v1";
 const TOLERANCE_SECONDS = 300;
@@ -49,9 +49,10 @@ export async function createSaspayPayment(input: SaspayCollectInput, apiKey: str
   // Code réseau issu de la liste officielle SasPay (GET /networks/), jamais deviné.
   const network = await resolveSaspayNetwork(input.countryCode, input.operatorLabel, apiKey);
   if (!network) {
+    const info = await describeNetworks(input.countryCode, apiKey).catch(() => "lecture impossible");
     return {
       ok: false,
-      message: `Aucun réseau SasPay pour ${input.countryCode.toUpperCase()} / ${input.operatorLabel}. Vérifie que ce pays et cet opérateur sont activés sur ton compte SasPay.`,
+      message: `Aucun réseau SasPay pour ${input.countryCode.toUpperCase()} / ${input.operatorLabel}. Diagnostic : ${info}.`,
     };
   }
 
