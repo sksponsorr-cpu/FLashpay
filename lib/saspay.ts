@@ -56,6 +56,15 @@ export async function createSaspayPayment(input: SaspayCollectInput, apiKey: str
     };
   }
 
+  // Numéro : tel que composé dans le pays (le 0 initial éventuel est conservé), indicatif ajouté si absent.
+  const dial: Record<string, string> = {
+    BF: "226", BJ: "229", CD: "243", CI: "225", CM: "237", GH: "233", GN: "224", KE: "254", ML: "223",
+    MW: "265", NE: "227", NG: "234", RW: "250", SN: "221", TG: "228", TZ: "255", UG: "256", ZM: "260",
+  };
+  const digits = input.phone.replace(/\D/g, "");
+  const code = dial[input.countryCode.toUpperCase()] ?? "";
+  const phone = code && !digits.startsWith(code) ? `${code}${digits}` : digits;
+
   const parts = input.name.trim().split(/\s+/);
   const body = {
     amount: input.amount.toFixed(2),
@@ -67,7 +76,7 @@ export async function createSaspayPayment(input: SaspayCollectInput, apiKey: str
       email: input.email,
       first_name: parts[0] || "Client",
       last_name: parts.slice(1).join(" ") || "FlashPay",
-      phone: `+${input.phone}`,
+      phone: `+${phone}`,
     },
   };
 
