@@ -62,7 +62,7 @@ export async function createSaspayPayment(input: SaspayCollectInput, apiKey: str
 
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}/payments/softpay/`, {
+    res = await fetch(`${BASE_URL}/payments/softpay/initialize/`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -91,11 +91,21 @@ export async function createSaspayPayment(input: SaspayCollectInput, apiKey: str
   }
 
   if (!res.ok) {
-    const message =
-      (typeof json["message"] === "string" && json["message"]) ||
-      (typeof json["detail"] === "string" && json["detail"]) ||
-      `Erreur SasPay (${res.status})`;
-    console.error("[saspay] softpay", res.status, message);
+    const envelope = json["error"] && typeof json["error"] === "object" ? (json["error"] as Record<string, unknown>) : null;
+    const businessMessage = envelope && typeof envelope["message"] === "string" ? envelope["message"] : null;
+    const businessCode = envelope && typeof envelope["code"] === "string" ? envelope["code"] : null;
+
+    // Erreur de validation : { "champ": ["message"] }
+    const fieldErrors = Object.entries(json)
+      .filter(([k, v]) => k !== "error" && k !== "success" && k !== "code" && Array.isArray(v))
+      .map(([k, v]) => `${k} : ${(v as unknown[]).join(", ")}`);
+
+    const detail = [businessMessage, businessCode ? `(${businessCode})` : null, fieldErrors.length ? fieldErrors.join(" ; ") : null]
+      .filter(Boolean)
+      .join(" ");
+
+    const message = `SasPay ${res.status} : ${detail || text.slice(0, 200) || "requête refusée"}`;
+    console.error("[saspay] softpay", res.status, text.slice(0, 1000));
     return { ok: false, message };
   }
 
