@@ -10,6 +10,7 @@ type WalletData = {
   minimums: { currency_code: string; minimum_amount: number }[];
   plan: string | null;
   fee: { withdrawal: number; conversion: number };
+  rates: { from_currency: string; to_currency: string; rate: number }[];
 };
 
 // Pays de destination des retraits, avec leur devise et leurs opérateurs mobile money.
@@ -48,7 +49,7 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
   const [error, setError] = useState("");
   const [open, setOpen] = useState<Action>(null);
   const [amount, setAmount] = useState("");
-  const [toCurrency, setToCurrency] = useState("USD");
+  const [toCurrency, setToCurrency] = useState("");
   const [country, setCountry] = useState("");
   const [operator, setOperator] = useState("");
   const [mobile, setMobile] = useState("");
@@ -87,6 +88,7 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
   function openAction(currency: string, mode: "withdraw" | "convert") {
     setOpen({ currency, mode });
     setAmount("");
+    setToCurrency("");
     setCountry("");
     setOperator("");
     setMobile("");
@@ -159,6 +161,12 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
 
   const minimum = (currency: string) => data.minimums.find((x) => x.currency_code === currency)?.minimum_amount;
   const destinationOptions = open && open.mode === "withdraw" ? countriesFor(open.currency) : [];
+  const targetCurrencies = open && open.mode === "convert"
+    ? Array.from(new Set([
+        ...data.rates.filter((r) => r.from_currency === open.currency).map((r) => r.to_currency),
+        ...Object.keys(labels),
+      ])).filter((c) => c !== open.currency).sort()
+    : [];
   const operatorOptions = country ? DESTINATIONS[country]?.operators ?? [] : [];
 
   return (
@@ -229,7 +237,12 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
               {open.mode === "convert" && (
                 <label className="fp-field">
                   <span>Vers la devise</span>
-                  <input className="fp-input" placeholder="ex. USD" value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} required />
+                  <select className="fp-input" value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} required>
+                    <option value="">Choisir une devise</option>
+                    {targetCurrencies.map((c) => (
+                      <option key={c} value={c}>{c} — {labels[c] ?? c}</option>
+                    ))}
+                  </select>
                 </label>
               )}
 
