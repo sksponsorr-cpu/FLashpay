@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { getSupportedCountry } from "@/lib/countries";
 import { computeTotal, createSwychrPaymentRequest, internationalMobile, localMobile } from "@/lib/swychr";
 import { createSaspayPayment } from "@/lib/saspay";
-import { getActiveProvider } from "@/lib/payment-provider";
+import { routeProvider } from "@/lib/payment-routing";
 
 const RATE_LIMIT_PER_MINUTE = 60;
 
@@ -88,6 +88,45 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Le moyen de paiement (payment_method) est requis pour une collecte live." }, { status: 400 });
   }
 
+  // Mode hébergé FlashPay : le client reste sur notre page (/pay/…) et choisit son opérateur.
+  // Utile pour les pays en paiement direct, où l'API ne renvoie pas de lien par défaut.
+  if (body.checkout === "hosted") {
+    if (!admin) return NextResponse.json({ message: "Service indisponible." }, { status: 503 });
+    const { data: owner } = await admin
+      .from("api_keys")
+      .select("owner_id, app_id")
+      .eq("key_hash", keyHash)
+      .is("revoked_at", null)
+      .maybeSingle();
+    if (!owner) return NextResponse.json({ message: "Cette clé est invalide ou révoquée." }, { status: 401 });
+
+    const token = randomBytes(16).toString("hex");
+    const { error: linkError } = await admin.from("payment_links").insert({
+      token,
+      owner_id: owner.owner_id,
+      app_id: owner.app_id,
+      label: body.description?.trim() || "Paiement",
+      amount,
+      currency_code: country.currency,
+      country_code: country.code,
+      is_active: true,
+      mode: isLive ? "live" : "test",
+    });
+    if (linkError) return NextResponse.json({ message: "Le lien de paiement n’a pas pu être créé." }, { status: 503 });
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://f-lashpay.vercel.app";
+    return NextResponse.json({
+      mode: isLive ? "live" : "test",
+      data: {
+        checkout_url: `${appUrl}/pay/${token}`,
+        country_code: country.code,
+        currency_code: country.currency,
+        amount,
+        message: "Redirige ton client vers checkout_url. Il choisit son opérateur et valide sur son téléphone.",
+      },
+    });
+  }
+
   const environment = isLive ? "live" : "test";
   const transactionId = body.transaction_id?.trim() || `FP${environment === "live" ? "" : "TEST"}-${randomBytes(8).toString("hex").toUpperCase()}`;
 
@@ -136,7 +175,7 @@ export async function POST(request: Request) {
   }
 
   // Collecte live : fournisseur actif (Swychr ou SasPay).
-  const provider = admin ? await getActiveProvider(admin) : "swychr";
+  const provider = routeProvider(country.code); // automatique par pays
   const paymentMethod = body.payment_method!.trim().toUpperCase();
   const description = body.description?.trim() || "Collecte FlashPay";
 
@@ -164,7 +203,7 @@ export async function POST(request: Request) {
         description,
         name: body.name.trim(),
         email: body.email?.trim() || process.env.SASPAY_DEFAULT_EMAIL || "paiements@flashpay.app",
-        phone: body.mobile, // numéro tel que saisi : la conversion se fait dans lib/saspay.ts
+        phone: internationalMobile(country.code, body.mobile),
       },
       apiKey,
     );
