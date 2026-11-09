@@ -1,6 +1,7 @@
 // FLASH PAY — SASPAY — paiement direct (softpay) et vérification des webhooks.
 // Serveur uniquement : SASPAY_API_KEY ne doit jamais être exposée au navigateur.
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { resolveSaspayNetwork } from "@/lib/saspay-networks";
 
 const BASE_URL = "https://api.saspay.me/api/v1";
 const TOLERANCE_SECONDS = 300;
@@ -45,12 +46,21 @@ export type SaspayCollectResult =
 export async function createSaspayPayment(input: SaspayCollectInput, apiKey: string): Promise<SaspayCollectResult> {
   if (!apiKey) return { ok: false, message: "Clé API SasPay manquante." };
 
+  // Code réseau issu de la liste officielle SasPay (GET /networks/), jamais deviné.
+  const network = await resolveSaspayNetwork(input.countryCode, input.operatorLabel, apiKey);
+  if (!network) {
+    return {
+      ok: false,
+      message: `Aucun réseau SasPay pour ${input.countryCode.toUpperCase()} / ${input.operatorLabel}. Vérifie que ce pays et cet opérateur sont activés sur ton compte SasPay.`,
+    };
+  }
+
   const parts = input.name.trim().split(/\s+/);
   const body = {
     amount: input.amount.toFixed(2),
     currency: input.currency,
     country: input.countryCode.toUpperCase(),
-    network: saspayNetwork(input.operatorLabel, input.countryCode),
+    network,
     description: input.description,
     customer: {
       email: input.email,
@@ -60,9 +70,11 @@ export async function createSaspayPayment(input: SaspayCollectInput, apiKey: str
     },
   };
 
-  let res: Response;
+  const paths = ["/payments/softpay/", "/payments/softpay/initialize/"];
+  let res!: Response;
   try {
-    res = await fetch(`${BASE_URL}/payments/softpay/initialize/`, {
+    for (const path of paths) {
+      res = await fetch(`${BASE_URL}${path}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -73,7 +85,9 @@ export async function createSaspayPayment(input: SaspayCollectInput, apiKey: str
       body: JSON.stringify(body),
       cache: "no-store",
       signal: AbortSignal.timeout(30000),
-    });
+      });
+      if (res.status !== 404) break; // 404 : on essaie le chemin suivant
+    }
   } catch (error) {
     const timeout = error instanceof Error && error.name === "TimeoutError";
     return {
