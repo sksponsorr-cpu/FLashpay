@@ -18,6 +18,7 @@ type CollectionBody = {
   payment_method?: string;
   description?: string;
   pass_digital_charge?: boolean;
+  checkout?: "hosted" | "direct";
   callback_url?: string;
   failed_callback_url?: string;
 };
