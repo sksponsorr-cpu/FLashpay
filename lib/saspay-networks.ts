@@ -99,3 +99,13 @@ export async function resolveSaspayNetwork(countryIso: string, operatorLabel: st
 
   return null;
 }
+
+/** Diagnostic : réseaux actifs trouvés pour un pays, et volumes lus. */
+export async function describeNetworks(countryIso: string, apiKey: string): Promise<string> {
+  const { countries, networks } = await load(apiKey);
+  const iso = countryIso.toUpperCase();
+  const codes = networks
+    .filter((n) => countries.get(typeof n["country"] === "string" ? (n["country"] as string) : "") === iso)
+    .map((n) => `${n["code"]}${n["is_active"] === false ? " (inactif)" : ""}`);
+  return `pays lus : ${countries.size}, réseaux lus : ${networks.length}, réseaux pour ${iso} : ${codes.length ? codes.join(", ") : "aucun"}`;
+}
