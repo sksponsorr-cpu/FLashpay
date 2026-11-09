@@ -164,7 +164,7 @@ export async function POST(request: Request) {
         description,
         name: body.name.trim(),
         email: body.email?.trim() || process.env.SASPAY_DEFAULT_EMAIL || "paiements@flashpay.app",
-        phone: internationalMobile(country.code, body.mobile),
+        phone: body.mobile, // numéro tel que saisi : la conversion se fait dans lib/saspay.ts
       },
       apiKey,
     );
