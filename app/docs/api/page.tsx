@@ -1,14 +1,14 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { getActiveProvider } from "@/lib/payment-provider";
-import { Rocket, KeyRound, Bell, ShieldCheck, Globe, Percent, AlertTriangle, Search, Menu, Zap, PlusCircle, LayoutDashboard, Code2, ChevronDown } from "lucide-react";
+import { Rocket, KeyRound, Bell, ShieldCheck, Globe, Percent, AlertTriangle, Search, Zap, PlusCircle, ChevronDown, Activity, List } from "lucide-react";
 
 export const metadata = {
   title: "Documentation API | FlashPay",
   description: "Guide d’intégration de l’API FlashPay.",
 };
+
+const BASE = "https://f-lashpay.vercel.app";
 
 const groups = [
   { label: "Démarrage", items: [
@@ -18,8 +18,10 @@ const groups = [
   ] },
   { label: "Intégration", items: [
     { id: "collecte", label: "Créer une collecte", icon: PlusCircle },
+    { id: "statut", label: "Suivre le statut", icon: Activity },
+    { id: "moyens", label: "Moyens de paiement", icon: List },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "pays", label: "Pays et devises", icon: Globe },
+    { id: "pays", label: "Pays et modes", icon: Globe },
     { id: "frais", label: "Frais", icon: Percent },
   ] },
   { label: "Référence", items: [
@@ -89,30 +91,87 @@ td code{background:#1d1f29;color:#ffb199;padding:1px 6px;border-radius:6px}
 section{scroll-margin-top:80px}
 `;
 
-// Fournisseur actif : détermine la forme de la réponse de création de collecte.
-async function currentProvider() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return "swychr" as const;
-  const admin = createSupabaseClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
-  });
-  return getActiveProvider(admin);
-}
+const CODE_COLLECT = [
+  "const response = await fetch('https://f-lashpay.vercel.app/api/v1/collections', {",
+  "  method: 'POST',",
+  "  headers: {",
+  "    'Content-Type': 'application/json',",
+  "    'X-FlashPay-Key': process.env.FLASHPAY_KEY,",
+  "  },",
+  "  body: JSON.stringify({",
+  "    country_code: 'CD',",
+  "    amount: 25000,",
+  "    mobile: '0812345678',",
+  "    name: 'Awa Sossou',",
+  "    payment_method: 'ORANGE',",
+  "    transaction_id: 'CMD-1042',",
+  "  }),",
+  "});",
+  "const result = await response.json();",
+].join("\n");
 
-async function getBackHref() {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    return user ? "/dashboard" : "/";
-  } catch {
-    return "/";
-  }
-}
+const CODE_HOSTED = [
+  "const response = await fetch('https://f-lashpay.vercel.app/api/v1/collections', {",
+  "  method: 'POST',",
+  "  headers: {",
+  "    'Content-Type': 'application/json',",
+  "    'X-FlashPay-Key': process.env.FLASHPAY_KEY,",
+  "  },",
+  "  body: JSON.stringify({",
+  "    country_code: 'CM',",
+  "    amount: 25000,",
+  "    mobile: '670000000',",
+  "    name: 'Client',",
+  "    payment_method: 'MTN',",
+  "    checkout: 'hosted',",
+  "    transaction_id: 'CMD-1043',",
+  "  }),",
+  "});",
+  "const { data } = await response.json();",
+  "// Redirige ton client vers data.checkout_url",
+].join("\n");
 
-async function ApiDocumentationContent() {
-  const backHref = await getBackHref();
-  const direct = (await currentProvider()) === "saspay";
+const CODE_STATUS = [
+  "const response = await fetch('https://f-lashpay.vercel.app/api/v1/collections/CMD-1042', {",
+  "  headers: { 'X-FlashPay-Key': process.env.FLASHPAY_KEY },",
+  "});",
+  "const { data } = await response.json();",
+  "// data.status : pending | successful | failed | cancelled | expired",
+].join("\n");
+
+const CODE_WEBHOOK = [
+  "import { createHmac, timingSafeEqual } from 'node:crypto';",
+  "",
+  "// rawBody : le corps brut reçu, sans le transformer en JSON avant la vérification.",
+  "function isGenuine(rawBody, timestamp, signature, secret) {",
+  "  const age = Math.abs(Date.now() / 1000 - Number(timestamp));",
+  "  if (!Number.isFinite(age) || age > 300) return false;",
+  "  const expected = createHmac('sha256', secret)",
+  "    .update(timestamp + '.' + rawBody)",
+  "    .digest('hex');",
+  "  const a = Buffer.from(signature);",
+  "  const b = Buffer.from(expected);",
+  "  return a.length === b.length && timingSafeEqual(a, b);",
+  "}",
+].join("\n");
+
+const CODE_WEBHOOK_BODY = [
+  "{",
+  "  \"event\": \"transaction.successful\",",
+  "  \"created_at\": \"2026-11-10T11:30:00.000Z\",",
+  "  \"data\": {",
+  "    \"transaction_id\": \"CMD-1042\",",
+  "    \"status\": \"successful\",",
+  "    \"amount\": 25000,",
+  "    \"currency_code\": \"XOF\",",
+  "    \"country_code\": \"BJ\",",
+  "    \"payment_method\": \"MTN\",",
+  "    \"environment\": \"live\"",
+  "  }",
+  "}",
+].join("\n");
+
+function ApiDocumentationContent() {
   return (
     <main className="fp-docs">
       <style>{css}</style>
@@ -120,10 +179,10 @@ async function ApiDocumentationContent() {
       <header className="fp-docs-top">
         <Link className="fp-docs-brand" href="/"><span className="fp-docs-logo">f</span><span>flash<b>pay</b></span></Link>
         <span className="fp-docs-icon" aria-hidden="true"><Search size={18} /></span>
-        <Link className="fp-docs-back" href={backHref}>← Retour à FlashPay</Link>
+        <Link className="fp-docs-back" href="/dashboard">← Retour à FlashPay</Link>
       </header>
 
-      <div className="fp-docs-crumb"><span>Démarrage</span><span>›</span><strong>FlashPay</strong></div>
+      <div className="fp-docs-crumb"><span>Documentation</span><span>›</span><strong>API FlashPay</strong></div>
 
       <div className="fp-docs-layout">
         <nav className="fp-docs-nav" aria-label="Sommaire de la documentation">
@@ -143,75 +202,110 @@ async function ApiDocumentationContent() {
         </nav>
 
         <article className="fp-docs-content">
-          <span className="fp-docs-kicker">API · Version test</span>
+          <span className="fp-docs-kicker">API · Version 1</span>
           <h1>Intègre FlashPay dans ton application.</h1>
-          <p className="fp-docs-lead">Crée des demandes de paiement mobile money depuis ton serveur et traite les notifications de statut. Garde tes clés secrètes et teste ton intégration avant toute mise en production.</p>
-
-          <div className="fp-docs-starts">
-            <a className="fp-docs-start" href="#cle"><span className="fp-docs-start-ico"><Zap size={22} /></span><strong>Démarrer en 5 minutes</strong><span className="t">Obtiens ta clé de test et lance ton premier encaissement.</span></a>
-            <a className="fp-docs-start" href="#collecte"><span className="fp-docs-start-ico"><Rocket size={22} /></span><strong>Créer une collecte</strong><span className="t">Envoie une demande de paiement mobile money depuis ton serveur.</span></a>
-            <a className="fp-docs-start" href="#notifications"><span className="fp-docs-start-ico"><Bell size={22} /></span><strong>Recevoir les notifications</strong><span className="t">Vérifie la signature et mets à jour tes commandes.</span></a>
-          </div>
+          <p className="fp-docs-lead">Crée une demande de paiement mobile money depuis ton serveur, puis suis son statut ou reçois une notification. FlashPay choisit automatiquement le mode de paiement selon le pays du client.</p>
 
           <section id="demarrage">
             <h2>Démarrage</h2>
-            <div className="fp-docs-card"><ol><li>Crée un compte FlashPay.</li><li>Génère une clé API depuis l’espace Développeur.</li><li>Envoie tes requêtes depuis ton serveur et vérifie les notifications reçues.</li></ol></div>
+            <div className="fp-docs-card"><ol>
+              <li>Crée une clé de test dans l’espace Développeur (préfixe <code className="fp-docs-inline">fp_test_</code>).</li>
+              <li>Envoie tes premières collectes en test : aucun argent n’est débité.</li>
+              <li>Quand ton compte est vérifié, crée une clé live (préfixe <code className="fp-docs-inline">fp_live_</code>) et remplace la clé de test dans ton serveur.</li>
+            </ol></div>
+            <p>Base de l’API : <code className="fp-docs-inline">{BASE}</code></p>
           </section>
 
           <section id="cle">
             <h2>Obtenir une clé</h2>
-            <p>Crée une clé et donne-lui un nom qui identifie ton intégration. Une clé secrète n’est affichée qu’une seule fois.</p>
-            <div className="fp-docs-note"><strong>Sécurité.</strong> Conserve la clé dans une variable d’environnement serveur. Ne l’intègre jamais dans le code navigateur ni dans un dépôt public.</div>
+            <p>Crée une clé dans l’espace Développeur, en lui donnant un nom qui identifie ton intégration. La clé secrète n’est affichée qu’une seule fois : copie-la immédiatement.</p>
+            <div className="fp-docs-note"><strong>Clé live.</strong> Elle n’est acceptée que si ton compte est vérifié et que les paiements réels sont ouverts. Sinon, FlashPay répond 403 à la création, et 503 à la collecte.</div>
+            <div className="fp-docs-note"><strong>Sécurité.</strong> Garde la clé dans une variable d’environnement serveur. Ne l’utilise jamais dans le code du navigateur ni dans un dépôt public.</div>
           </section>
 
           <section id="auth">
             <h2>Authentification</h2>
-            <p>Ajoute ta clé dans l’en-tête <code className="fp-docs-inline">X-FlashPay-Key</code> de chaque requête.</p>
+            <p>Chaque requête porte ta clé dans l’en-tête <code className="fp-docs-inline">X-FlashPay-Key</code>.</p>
             <div className="fp-docs-code"><div className="fp-docs-code-head">En-tête HTTP</div><pre>{"X-FlashPay-Key: fp_test_…"}</pre></div>
           </section>
 
           <section id="collecte">
             <h2>Créer une collecte</h2>
-            <p>Envoie une requête <code className="fp-docs-inline">POST /api/v1/collections</code> avec les données du client.</p>
+            <p>Envoie une requête <code className="fp-docs-inline">POST {BASE}/api/v1/collections</code>.</p>
             <div className="fp-docs-table-wrap"><table><thead><tr><th>Champ</th><th>Obligatoire</th><th>Description</th></tr></thead><tbody>
-              <tr><td><code>country_code</code></td><td>Oui</td><td>Code pays à deux lettres.</td></tr>
-              <tr><td><code>amount</code></td><td>Oui</td><td>Montant demandé, strictement supérieur à zéro.</td></tr>
-              <tr><td><code>mobile</code></td><td>Oui</td><td>Numéro de téléphone local du payeur.</td></tr>
+              <tr><td><code>country_code</code></td><td>Oui</td><td>Code pays à deux lettres (voir « Pays et modes »).</td></tr>
+              <tr><td><code>amount</code></td><td>Oui</td><td>Montant dans la devise du pays, strictement supérieur à zéro.</td></tr>
               <tr><td><code>name</code></td><td>Oui</td><td>Nom du payeur.</td></tr>
-              <tr><td><code>payment_method</code></td><td>Selon le mode</td><td>Moyen de paiement disponible dans le pays concerné.</td></tr>
-              <tr><td><code>transaction_id</code></td><td>Non</td><td>Référence unique de ta commande.</td></tr>
+              <tr><td><code>mobile</code></td><td>Oui</td><td>Numéro mobile money du payeur, sans l’indicatif pays.</td></tr>
+              <tr><td><code>payment_method</code></td><td>Oui en live</td><td>Opérateur mobile money (voir « Moyens de paiement »).</td></tr>
+              <tr><td><code>transaction_id</code></td><td>Non</td><td>Ta référence unique. Sans elle, FlashPay en génère une. Une référence déjà utilisée renvoie 409.</td></tr>
+              <tr><td><code>checkout</code></td><td>Non</td><td>Mettre <code>hosted</code> pour obtenir une page de paiement hébergée (<code>checkout_url</code>).</td></tr>
+              <tr><td><code>email</code></td><td>Non</td><td>E-mail du payeur, transmis au prestataire quand il le demande.</td></tr>
             </tbody></table></div>
-            {direct ? (
-              <div className="fp-docs-note"><strong>Paiement direct.</strong> Le client reste sur ta page et valide la demande avec son code PIN sur son téléphone. La réponse ne contient pas de lien de redirection : suis le statut de la transaction grâce aux notifications de paiement.</div>
-            ) : (
-              <div className="fp-docs-note"><strong>Redirection.</strong> La réponse contient <code className="fp-docs-inline">payment_link</code>. Redirige le client vers cette adresse pour qu’il finalise le paiement.</div>
-            )}
-            <h3>Exemple côté serveur</h3>
-            <div className="fp-docs-code"><div className="fp-docs-code-head">JavaScript · serveur</div><pre>{`const response = await fetch("/api/v1/collections", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "X-FlashPay-Key": process.env.FLASHPAY_API_KEY,
-  },
-  body: JSON.stringify({
-    country_code: "CM",
-    amount: 25000,
-    mobile: "670000000",
-    name: "Client",
-  }),
-});
-const result = await response.json();`}</pre></div>
+
+            <h3>Pays en paiement direct (RDC, Burkina Faso, Bénin, Mali, Togo)</h3>
+            <p>Le client reste sur ton site et valide la demande sur son téléphone. Aucune redirection n’est nécessaire : suis le statut avec « Suivre le statut ».</p>
+            <div className="fp-docs-code"><div className="fp-docs-code-head">JavaScript · serveur</div><pre>{CODE_COLLECT}</pre></div>
+
+            <h3>Pays en paiement hébergé (Cameroun, Congo, Sénégal, Côte d’Ivoire, Nigeria, Rwanda, Ghana, Kenya)</h3>
+            <p>Ajoute <code className="fp-docs-inline">checkout: &quot;hosted&quot;</code> et redirige ton client vers <code className="fp-docs-inline">data.checkout_url</code>. Il y choisit son opérateur et valide sur son téléphone.</p>
+            <div className="fp-docs-code"><div className="fp-docs-code-head">JavaScript · serveur</div><pre>{CODE_HOSTED}</pre></div>
+
+            <div className="fp-docs-note"><strong>Mode test.</strong> Une clé <code className="fp-docs-inline">fp_test_</code> ne contacte aucun prestataire. La réponse contient <code className="fp-docs-inline">mode: &quot;test&quot;</code> et une référence commençant par <code className="fp-docs-inline">FPTEST-</code>.</div>
+          </section>
+
+          <section id="statut">
+            <h2>Suivre le statut</h2>
+            <p>Interroge <code className="fp-docs-inline">GET {BASE}/api/v1/collections/&#123;transaction_id&#125;</code> avec ta clé. Tant que le statut est <code className="fp-docs-inline">pending</code>, attends quelques secondes avant de réessayer. Le statut final ne change plus.</p>
+            <div className="fp-docs-table-wrap"><table><thead><tr><th>Statut</th><th>Signification</th></tr></thead><tbody>
+              <tr><td><code>pending</code></td><td>Demande envoyée, en attente de la validation du client.</td></tr>
+              <tr><td><code>successful</code></td><td>Paiement reçu. Tu peux livrer la commande.</td></tr>
+              <tr><td><code>failed</code></td><td>Paiement refusé ou échoué.</td></tr>
+              <tr><td><code>cancelled</code></td><td>Paiement annulé par le client.</td></tr>
+              <tr><td><code>expired</code></td><td>Le client n’a pas validé à temps.</td></tr>
+            </tbody></table></div>
+            <div className="fp-docs-code"><div className="fp-docs-code-head">JavaScript · serveur</div><pre>{CODE_STATUS}</pre></div>
+          </section>
+
+          <section id="moyens">
+            <h2>Moyens de paiement</h2>
+            <p>Avant de proposer un opérateur à ton client, demande la liste acceptée pour son pays :</p>
+            <div className="fp-docs-code"><div className="fp-docs-code-head">Requête</div><pre>{`GET ${BASE}/api/v1/payment-methods?country_code=CD`}</pre></div>
+            <p>La réponse contient <code className="fp-docs-inline">payment_methods</code>, une liste de valeurs à envoyer telles quelles dans <code className="fp-docs-inline">payment_method</code>.</p>
           </section>
 
           <section id="notifications">
             <h2>Notifications</h2>
-            <p>FlashPay signale les changements de statut à l’adresse webhook configurée. Vérifie la signature avec le secret qui t’a été montré à sa création et rends ton traitement idempotent.</p>
-            <div className="fp-docs-note"><strong>Important.</strong> Ne traite une notification qu’après validation de sa signature et du statut de la transaction.</div>
+            <p>Quand une collecte est payée, FlashPay envoie une requête <code className="fp-docs-inline">POST</code> à l’adresse de notification configurée dans ton espace Développeur.</p>
+            <div className="fp-docs-table-wrap"><table><thead><tr><th>En-tête</th><th>Contenu</th></tr></thead><tbody>
+              <tr><td><code>X-FlashPay-Timestamp</code></td><td>Date d’envoi en secondes (Unix).</td></tr>
+              <tr><td><code>X-FlashPay-Signature</code></td><td>HMAC-SHA256 en hexadécimal de <code>timestamp + &quot;.&quot; + corps brut</code>, signé avec ton secret de notification.</td></tr>
+            </tbody></table></div>
+            <div className="fp-docs-code"><div className="fp-docs-code-head">Corps de la notification</div><pre>{CODE_WEBHOOK_BODY}</pre></div>
+            <div className="fp-docs-code"><div className="fp-docs-code-head">Vérification de la signature · Node.js</div><pre>{CODE_WEBHOOK}</pre></div>
+            <div className="fp-docs-note"><strong>Important.</strong> Vérifie la signature et l’âge de la notification (5 minutes maximum) avant de la traiter. Réponds 2xx dès réception. FlashPay réessaie jusqu’à 3 fois, à 0 s, 2 s et 6 s. Rends ton traitement idempotent : une même transaction peut être notifiée deux fois.</div>
+            <div className="fp-docs-note"><strong>Événement disponible.</strong> Seul <code className="fp-docs-inline">transaction.successful</code> est envoyé pour le moment. Pour les échecs, interroge le statut.</div>
           </section>
 
           <section id="pays">
-            <h2>Pays et devises</h2>
-            <p>Les pays et moyens de paiement disponibles sont ceux configurés dans FlashPay au moment de la demande. Utilise le code pays attendu par l’API.</p>
+            <h2>Pays et modes</h2>
+            <p>FlashPay choisit le mode selon le pays du client. Tu n’as rien à configurer.</p>
+            <div className="fp-docs-table-wrap"><table><thead><tr><th>Pays</th><th>Code</th><th>Mode</th></tr></thead><tbody>
+              <tr><td>République démocratique du Congo</td><td><code>CD</code></td><td>Direct</td></tr>
+              <tr><td>Burkina Faso</td><td><code>BF</code></td><td>Direct</td></tr>
+              <tr><td>Bénin</td><td><code>BJ</code></td><td>Direct</td></tr>
+              <tr><td>Mali</td><td><code>ML</code></td><td>Direct</td></tr>
+              <tr><td>Togo</td><td><code>TG</code></td><td>Direct</td></tr>
+              <tr><td>Cameroun</td><td><code>CM</code></td><td>Hébergé</td></tr>
+              <tr><td>Congo-Brazzaville</td><td><code>CG</code></td><td>Hébergé</td></tr>
+              <tr><td>Sénégal</td><td><code>SN</code></td><td>Hébergé</td></tr>
+              <tr><td>Côte d’Ivoire</td><td><code>CI</code></td><td>Hébergé</td></tr>
+              <tr><td>Nigeria</td><td><code>NG</code></td><td>Hébergé</td></tr>
+              <tr><td>Rwanda</td><td><code>RW</code></td><td>Hébergé</td></tr>
+              <tr><td>Ghana</td><td><code>GH</code></td><td>Hébergé</td></tr>
+              <tr><td>Kenya</td><td><code>KE</code></td><td>Hébergé</td></tr>
+            </tbody></table></div>
+            <div className="fp-docs-note"><strong>Direct</strong> : le client valide sur son téléphone, sans quitter ton site. <strong>Hébergé</strong> : redirige le client vers <code className="fp-docs-inline">checkout_url</code>.</div>
           </section>
 
           <section id="frais">
@@ -222,17 +316,24 @@ const result = await response.json();`}</pre></div>
           <section id="erreurs">
             <h2>Codes d’erreur</h2>
             <div className="fp-docs-table-wrap"><table><thead><tr><th>Code</th><th>Signification</th><th>Action</th></tr></thead><tbody>
-              <tr><td>400</td><td>Données invalides</td><td>Vérifie le corps de la requête.</td></tr>
-              <tr><td>401</td><td>Clé manquante ou invalide</td><td>Vérifie l’en-tête d’authentification.</td></tr>
-              <tr><td>409</td><td>Référence déjà utilisée</td><td>Envoie une référence unique.</td></tr>
-              <tr><td>429</td><td>Limite de requêtes dépassée</td><td>Attends avant de réessayer.</td></tr>
-              <tr><td>503</td><td>Service indisponible</td><td>Réessaie plus tard ou contacte le support.</td></tr>
+              <tr><td>400</td><td>Données invalides, pays non pris en charge, ou <code>payment_method</code> absent en live.</td><td>Vérifie le corps de la requête.</td></tr>
+              <tr><td>401</td><td>Clé absente, invalide ou révoquée.</td><td>Vérifie l’en-tête <code>X-FlashPay-Key</code>.</td></tr>
+              <tr><td>404</td><td>Collecte introuvable pour ce compte.</td><td>Vérifie la référence <code>transaction_id</code>.</td></tr>
+              <tr><td>409</td><td>Référence déjà utilisée.</td><td>Envoie une référence unique.</td></tr>
+              <tr><td>429</td><td>Plus de 60 requêtes par minute avec la même clé.</td><td>Attends 60 secondes (en-tête <code>Retry-After</code>).</td></tr>
+              <tr><td>502</td><td>Le prestataire a refusé la demande (mode hébergé).</td><td>Réessaie avec un autre opérateur.</td></tr>
+              <tr><td>503</td><td>Paiements live non ouverts, ou service indisponible.</td><td>Réessaie plus tard ou contacte le support.</td></tr>
             </tbody></table></div>
           </section>
 
           <section id="production">
             <h2>Passer en production</h2>
-            <p>Les collectes réelles demeurent protégées par les contrôles d’activation et de vérification côté serveur. Les paramètres de cette documentation ne désactivent aucun garde-fou.</p>
+            <div className="fp-docs-card"><ol>
+              <li>Ton compte est vérifié dans l’espace Développeur.</li>
+              <li>Tu as créé une clé <code className="fp-docs-inline">fp_live_</code> et remplacé la clé de test sur ton serveur.</li>
+              <li>Tu as testé au moins une collecte dans chaque mode utilisé par tes clients (direct et hébergé).</li>
+              <li>Ton endpoint de notification répond 2xx et vérifie la signature.</li>
+            </ol></div>
           </section>
 
           <p className="fp-docs-footer">FlashPay · Documentation développeur</p>
