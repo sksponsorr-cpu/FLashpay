@@ -40,7 +40,7 @@ export default function AppSwitcher({ currentId, onChange }: { currentId: string
               {a.id === current.id && <span className="as-dot" />}
             </button>
           ))}
-          <Link className="as-manage" href="/apps">+ Gérer mes apps</Link>
+          <Link className="as-manage" href="/apps?manage=1">+ Gérer mes apps</Link>
         </div>
       )}
     </div>
