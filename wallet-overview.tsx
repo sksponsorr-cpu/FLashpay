@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 type Wallet = { currency_code: string; balance: number };
 type Movement = { id: string; currency_code: string; kind: string; amount: number; created_at: string };
@@ -11,46 +10,53 @@ type WalletData = {
   minimums: { currency_code: string; minimum_amount: number }[];
   plan: string | null;
   fee: { withdrawal: number; conversion: number };
+  rates: { from_currency: string; to_currency: string; rate: number }[];
 };
-type Country = { code: string; name: string; currency_code: string };
+
+// Pays de destination des retraits, avec leur devise et leurs opérateurs mobile money.
+const DESTINATIONS: Record<string, { name: string; currency: string; operators: string[] }> = {
+  CM: { name: "Cameroun", currency: "XAF", operators: ["MTN MoMo", "Orange Money", "Airtel Money"] },
+  CG: { name: "Congo-Brazzaville", currency: "XAF", operators: ["MTN MoMo", "Airtel Money"] },
+  CD: { name: "RD Congo", currency: "CDF", operators: ["Airtel Money", "Orange Money", "M-Pesa", "Africell Money"] },
+  SN: { name: "Sénégal", currency: "XOF", operators: ["Orange Money", "Wave"] },
+  CI: { name: "Côte d’Ivoire", currency: "XOF", operators: ["Orange Money", "MTN MoMo", "Moov Money", "Wave"] },
+  BF: { name: "Burkina Faso", currency: "XOF", operators: ["Orange Money", "Moov Money"] },
+  BJ: { name: "Bénin", currency: "XOF", operators: ["MTN MoMo", "Moov Money"] },
+  TG: { name: "Togo", currency: "XOF", operators: ["Moov Money"] },
+  ML: { name: "Mali", currency: "XOF", operators: ["Orange Money", "Moov Money"] },
+  RW: { name: "Rwanda", currency: "RWF", operators: ["MTN MoMo", "Airtel Money"] },
+  KE: { name: "Kenya", currency: "KES", operators: ["M-Pesa", "Airtel Money"] },
+  GH: { name: "Ghana", currency: "GHS", operators: ["MTN MoMo", "Vodafone Cash"] },
+  NG: { name: "Nigeria", currency: "NGN", operators: ["Bank transfer"] },
+};
 
 const labels: Record<string, string> = {
   XAF: "Franc CFA (CEMAC)", XOF: "Franc CFA (UEMOA)", CDF: "Franc congolais",
-  NGN: "Naira nigérian", RWF: "Franc rwandais", USD: "Dollar américain",
-};
-const operatorsByCurrency: Record<string, string[]> = {
-  XAF: ["MTN MoMo", "Orange Money", "Airtel Money"],
-  XOF: ["Orange Money", "MTN MoMo", "Moov Money", "Wave"],
-  CDF: ["Airtel Money", "Orange Money", "M-Pesa", "Africell Money"],
-  KES: ["M-Pesa", "Airtel Money"],
-  RWF: ["MTN MoMo", "Airtel Money"],
-  GHS: ["MTN MoMo", "Vodafone Cash", "AirtelTigo Money"],
-  NGN: ["Virement bancaire"],
-  USD: ["Virement bancaire"],
+  NGN: "Naira nigérian", RWF: "Franc rwandais", USD: "Dollar américain", KES: "Shilling kényan", GHS: "Cedi ghanéen",
 };
 const kinds: Record<string, string> = {
   collection: "Encaissement", withdrawal: "Retrait", conversion_in: "Conversion reçue",
   conversion_out: "Conversion envoyée", adjustment: "Ajustement",
 };
 const fmt = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n);
-const dateFmt = (v: string) => new Date(v).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const dateFmt = (v: string) =>
+  new Date(v).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-type Mode = "withdraw" | "convert";
+type Action = { currency: string; mode: "withdraw" | "convert" } | null;
 
-export default function WalletOverview({ appId, onSubmitted, autoWithdraw = false }: { appId: string; onSubmitted?: (mode: Mode) => void; autoWithdraw?: boolean }) {
+export default function WalletOverview({ appId, onSubmitted, autoWithdraw = false }: { appId: string; onSubmitted?: (mode: "withdraw" | "convert") => void; autoWithdraw?: boolean }) {
   const [data, setData] = useState<WalletData | null>(null);
   const [error, setError] = useState("");
-  const [open, setOpen] = useState<{ currency: string; mode: Mode } | null>(null);
-  const [step, setStep] = useState(1);
+  const [open, setOpen] = useState<Action>(null);
   const [amount, setAmount] = useState("");
-  const [countryCode, setCountryCode] = useState("");
+  const [toCurrency, setToCurrency] = useState("");
+  const [country, setCountry] = useState("");
   const [operator, setOperator] = useState("");
   const [mobile, setMobile] = useState("");
-  const [beneficiary, setBeneficiary] = useState("");
-  const [toCurrency, setToCurrency] = useState("USD");
-  const [countries, setCountries] = useState<Country[]>([]);
+  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [noticeOk, setNoticeOk] = useState(false);
 
   async function load() {
     try {
@@ -63,74 +69,87 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
       setError(e instanceof Error ? e.message : "Impossible de charger le portefeuille.");
     }
   }
-  useEffect(() => { void load(); }, [appId]);
 
-  useEffect(() => {
-    createClient().from("supported_countries").select("code,name,currency_code").order("name").then(({ data }) => {
-      if (data) setCountries(data as Country[]);
-    });
-  }, []);
+  useEffect(() => { void load(); }, [appId]);
 
   // Ouvre directement le formulaire de retrait (depuis « Demander un retrait »)
   useEffect(() => {
     if (autoWithdraw && data && data.wallets.length > 0 && !open) {
-      const w = data.wallets.find((x) => x.balance > 0) ?? data.wallets[0];
-      openAction(w.currency_code, "withdraw");
+      const withBalance = data.wallets.find((w) => w.balance > 0) ?? data.wallets[0];
+      openAction(withBalance.currency_code, "withdraw");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoWithdraw, data]);
 
-  function openAction(currency: string, mode: Mode) {
+  // Pays proposés : ceux qui utilisent la devise du portefeuille
+  const countriesFor = (currency: string) =>
+    Object.entries(DESTINATIONS).filter(([, d]) => d.currency === currency);
+
+  function openAction(currency: string, mode: "withdraw" | "convert") {
     setOpen({ currency, mode });
-    setStep(1);
-    setAmount(""); setCountryCode(""); setOperator(""); setMobile(""); setBeneficiary("");
+    setAmount("");
+    setToCurrency("");
+    setCountry("");
+    setOperator("");
+    setMobile("");
+    setName("");
     setNotice("");
   }
-  function closeAction() { setOpen(null); }
 
-  const current = open ? data?.wallets.find((w) => w.currency_code === open.currency) : undefined;
-  const minimum = open ? data?.minimums.find((m) => m.currency_code === open.currency)?.minimum_amount ?? 0 : 0;
-  const countriesForCurrency = open ? countries.filter((c) => c.currency_code === open.currency) : [];
-  const operators = open ? (operatorsByCurrency[open.currency] ?? []) : [];
-  const amountNum = Number(amount);
-  const fee = open?.mode === "withdraw" ? Math.round(amountNum * (data?.fee.withdrawal ?? 0)) / 100 : 0;
-
-  function validateStep(): string {
-    if (step === 1) {
-      if (!(amountNum > 0)) return "Saisis un montant.";
-      if (open && amountNum < minimum) return `Le minimum est ${fmt(minimum)} ${open.currency}.`;
-      if (current && amountNum > current.balance) return "Le montant dépasse ton solde disponible.";
-    }
-    if (step === 2 && (!countryCode || !operator)) return "Choisis le pays et l’opérateur du bénéficiaire.";
-    if (step === 3 && (!mobile.trim() || !beneficiary.trim())) return "Indique le nom et le numéro du bénéficiaire.";
-    return "";
+  function closeAction() {
+    setOpen(null);
+    setAmount("");
   }
 
-  function next() {
-    const err = validateStep();
-    if (err) { setNotice(err); return; }
-    setNotice("");
-    setStep((s) => s + 1);
-  }
-
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!open) return;
-    setBusy(true); setNotice("");
-    const payload = open.mode === "withdraw"
-      ? { action: "withdraw", currency_code: open.currency, amount: amountNum, app_id: appId,
-          destination: { country_code: countryCode, operator, mobile: mobile.trim(), name: beneficiary.trim() } }
-      : { action: "convert", from_currency: open.currency, to_currency: toCurrency.toUpperCase(), amount: amountNum, app_id: appId };
+    setBusy(true);
+    setNotice("");
     try {
-      const response = await fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      let response: Response;
+      if (open.mode === "withdraw") {
+        // Retrait vers un mobile money : la demande part immédiatement pour les comptes vérifiés.
+        response = await fetch("/api/withdrawals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "schedule",
+            currency_code: open.currency,
+            amount: Number(amount),
+            destination: { country_code: country, operator, mobile, name },
+          }),
+        });
+      } else {
+        response = await fetch("/api/wallet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "convert",
+            from_currency: open.currency,
+            to_currency: toCurrency.toUpperCase(),
+            amount: Number(amount),
+            app_id: appId,
+          }),
+        });
+      }
+
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? "Demande refusée.");
+      if (!response.ok || result.ok === false) throw new Error(result.message ?? "Demande refusée.");
+
       const mode = open.mode;
       setOpen(null);
-      setNotice(mode === "withdraw" ? "Demande de retrait enregistrée. Elle est en attente de traitement." : "Demande de conversion enregistrée.");
+      setAmount("");
+      setNoticeOk(true);
+      setNotice(
+        mode === "withdraw"
+          ? result.message ?? "Retrait enregistré."
+          : "Demande de conversion enregistrée."
+      );
       await load();
       onSubmitted?.(mode);
     } catch (e) {
+      setNoticeOk(false);
       setNotice(e instanceof Error ? e.message : "Demande refusée.");
     } finally {
       setBusy(false);
@@ -140,7 +159,15 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
   if (error) return <p className="fp-muted">{error}</p>;
   if (!data) return <p className="fp-muted">Chargement des portefeuilles…</p>;
 
-  const minOf = (c: string) => data.minimums.find((x) => x.currency_code === c)?.minimum_amount;
+  const minimum = (currency: string) => data.minimums.find((x) => x.currency_code === currency)?.minimum_amount;
+  const destinationOptions = open && open.mode === "withdraw" ? countriesFor(open.currency) : [];
+  const targetCurrencies = open && open.mode === "convert"
+    ? Array.from(new Set([
+        ...data.rates.filter((r) => r.from_currency === open.currency).map((r) => r.to_currency),
+        ...Object.keys(labels),
+      ])).filter((c) => c !== open.currency).sort()
+    : [];
+  const operatorOptions = country ? DESTINATIONS[country]?.operators ?? [] : [];
 
   return (
     <div className="fp-wallets">
@@ -158,10 +185,14 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
               <span className="fp-code">{wallet.currency_code}</span>
               <span className="fp-small">{labels[wallet.currency_code] ?? wallet.currency_code}</span>
             </div>
-            <div className="fp-wallet-balance">{fmt(wallet.balance)} <small>{wallet.currency_code}</small></div>
+            <div className="fp-wallet-balance">
+              {fmt(wallet.balance)} <small>{wallet.currency_code}</small>
+            </div>
             <div className="fp-wallet-meta">
               Retrait {data.fee.withdrawal}% · Conversion {data.fee.conversion}%
-              {minOf(wallet.currency_code) !== undefined && <> · Minimum {fmt(minOf(wallet.currency_code)!)} {wallet.currency_code}</>}
+              {minimum(wallet.currency_code) !== undefined && (
+                <> · Minimum {fmt(minimum(wallet.currency_code)!)} {wallet.currency_code}</>
+              )}
             </div>
             <div className="fp-actions">
               <button className="fp-btn" onClick={() => openAction(wallet.currency_code, "withdraw")}>Retirer</button>
@@ -171,7 +202,7 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
         ))}
       </div>
 
-      {notice && !open && <p role="status" className="fp-notice">{notice}</p>}
+      {notice && <p role="status" className="fp-notice" style={noticeOk ? undefined : { background: "#fdecea", color: "#c8321a" }}>{notice}</p>}
 
       <article className="fp-card">
         <div className="fp-card-head">
@@ -181,88 +212,75 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
         {!data.movements.length && <p className="fp-muted">Aucun mouvement.</p>}
         {data.movements.slice(0, 10).map((m) => (
           <div className="fp-row" key={m.id}>
-            <div><strong>{kinds[m.kind] ?? m.kind}</strong><span className="fp-small">{dateFmt(m.created_at)}</span></div>
-            <strong className={m.amount > 0 ? "fp-plus" : ""}>{m.amount > 0 ? "+" : ""}{fmt(m.amount)} {m.currency_code}</strong>
+            <div>
+              <strong>{kinds[m.kind] ?? m.kind}</strong>
+              <span className="fp-small">{dateFmt(m.created_at)}</span>
+            </div>
+            <strong className={m.amount > 0 ? "fp-plus" : ""}>
+              {m.amount > 0 ? "+" : ""}{fmt(m.amount)} {m.currency_code}
+            </strong>
           </div>
         ))}
       </article>
 
       {open && (
         <div className="fp-modal-overlay" onClick={closeAction}>
-          <div className="fp-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <style>{`.fp-modal-pro{border-radius:26px;padding:26px 24px;max-width:440px;box-shadow:0 40px 80px -40px rgba(40,20,90,.45)}.fp-modal-pro .fp-input{height:52px;border-radius:14px;background:#faf8ff;border:1px solid #ebe6f3;padding:0 14px;font-size:15px}.fp-modal-pro .fp-field span{font-weight:700;font-size:14px;color:#1d1530}.fp-modal-pro .fp-form{gap:16px}.fp-modal-pro .fp-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fp-modal-pro .fp-btn{height:50px;border-radius:14px;font-weight:700}.fp-modal-pro .fp-close{width:40px;height:40px;border-radius:12px;background:#f3f0fb;border:0}`}</style>
+          <div className="fp-modal fp-modal-pro" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="fp-modal-head">
               <strong>{open.mode === "withdraw" ? "Demande de retrait" : "Demande de conversion"}</strong>
               <button type="button" className="fp-close" aria-label="Fermer" onClick={closeAction}>×</button>
             </div>
-
-            {open.mode === "withdraw" && (
-              <div className="fp-steps">
-                {["Montant", "Destination", "Bénéficiaire", "Confirmation"].map((label, i) => (
-                  <span key={label} className={i + 1 === step ? "fp-step on" : i + 1 < step ? "fp-step done" : "fp-step"}>{i + 1}. {label}</span>
-                ))}
-              </div>
-            )}
-
+            <p className="fp-muted">
+              Solde disponible : {fmt(data.wallets.find((w) => w.currency_code === open.currency)?.balance ?? 0)} {open.currency}
+            </p>
             <form className="fp-form" onSubmit={submit}>
-              {(open.mode === "convert" || step === 1) && (
-                <>
-                  <p className="fp-muted">Solde disponible : {fmt(current?.balance ?? 0)} {open.currency}{open.mode === "withdraw" && minimum ? ` · minimum ${fmt(minimum)} ${open.currency}` : ""}</p>
-                  {open.mode === "convert" && (
-                    <label className="fp-field"><span>Vers la devise</span>
-                      <input className="fp-input" placeholder="ex. USD" value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} required />
-                    </label>
-                  )}
-                  <label className="fp-field"><span>Montant en {open.currency}</span>
-                    <input className="fp-input" inputMode="decimal" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-                  </label>
-                </>
+              {open.mode === "convert" && (
+                <label className="fp-field">
+                  <span>Vers la devise</span>
+                  <select className="fp-input" value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} required>
+                    <option value="">Choisir une devise</option>
+                    {targetCurrencies.map((c) => (
+                      <option key={c} value={c}>{c} — {labels[c] ?? c}</option>
+                    ))}
+                  </select>
+                </label>
               )}
 
-              {open.mode === "withdraw" && step === 2 && (
+              {open.mode === "withdraw" && (
                 <>
-                  <label className="fp-field"><span>Pays du bénéficiaire</span>
-                    <select className="fp-input" value={countryCode} onChange={(e) => { setCountryCode(e.target.value); setOperator(""); }}>
+                  <label className="fp-field">
+                    <span>Pays de réception</span>
+                    <select className="fp-input" value={country} onChange={(e) => { setCountry(e.target.value); setOperator(""); }} required>
                       <option value="">Choisir un pays</option>
-                      {countriesForCurrency.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                      {destinationOptions.map(([code, d]) => <option key={code} value={code}>{d.name}</option>)}
                     </select>
                   </label>
-                  <label className="fp-field"><span>Opérateur</span>
-                    <select className="fp-input" value={operator} onChange={(e) => setOperator(e.target.value)}>
+                  <label className="fp-field">
+                    <span>Opérateur mobile money</span>
+                    <select className="fp-input" value={operator} onChange={(e) => setOperator(e.target.value)} required disabled={!country}>
                       <option value="">Choisir un opérateur</option>
-                      {operators.map((o) => <option key={o} value={o}>{o}</option>)}
+                      {operatorOptions.map((o) => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </label>
-                </>
-              )}
-
-              {open.mode === "withdraw" && step === 3 && (
-                <>
-                  <label className="fp-field"><span>Nom du bénéficiaire</span>
-                    <input className="fp-input" value={beneficiary} onChange={(e) => setBeneficiary(e.target.value)} />
+                  <label className="fp-field">
+                    <span>Numéro qui recevra l’argent</span>
+                    <input className="fp-input" inputMode="tel" placeholder="ex. 812345678" value={mobile} onChange={(e) => setMobile(e.target.value)} required />
                   </label>
-                  <label className="fp-field"><span>Numéro mobile du bénéficiaire</span>
-                    <input className="fp-input" inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} />
+                  <label className="fp-field">
+                    <span>Nom du bénéficiaire</span>
+                    <input className="fp-input" placeholder="Nom complet" value={name} onChange={(e) => setName(e.target.value)} required />
                   </label>
                 </>
               )}
 
-              {open.mode === "withdraw" && step === 4 && (
-                <div className="fp-recap">
-                  <div className="fp-row"><span>Montant demandé</span><strong>{fmt(amountNum)} {open.currency}</strong></div>
-                  <div className="fp-row"><span>Frais FlashPay ({data.fee.withdrawal} %)</span><strong>{fmt(fee)} {open.currency}</strong></div>
-                  <div className="fp-row"><span>Montant reçu par le bénéficiaire</span><strong>{fmt(amountNum - fee)} {open.currency}</strong></div>
-                  <div className="fp-row"><span>Bénéficiaire</span><strong>{beneficiary} · {mobile}</strong></div>
-                  <div className="fp-row"><span>Pays / opérateur</span><strong>{countriesForCurrency.find((c) => c.code === countryCode)?.name} · {operator}</strong></div>
-                </div>
-              )}
-
-              {notice && <p className="fp-notice" role="status">{notice}</p>}
-
+              <label className="fp-field">
+                <span>Montant en {open.currency}</span>
+                <input className="fp-input" inputMode="decimal" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+              </label>
               <div className="fp-actions">
-                {open.mode === "withdraw" && step > 1 && <button type="button" className="fp-btn fp-btn-ghost" onClick={() => setStep((s) => s - 1)}>Retour</button>}
-                {open.mode === "withdraw" && step < 4 && <button type="button" className="fp-btn" onClick={next}>Continuer</button>}
-                {(open.mode === "convert" || step === 4) && <button className="fp-btn" disabled={busy || !amount}>{busy ? "Envoi…" : "Confirmer"}</button>}
-                <button type="button" className="fp-btn fp-btn-ghost" onClick={closeAction}>Annuler</button>
+                <button className="fp-btn" disabled={busy || !amount}>{busy ? "Envoi…" : "Confirmer"}</button>
+                <button className="fp-btn fp-btn-ghost" type="button" onClick={closeAction}>Annuler</button>
               </div>
             </form>
           </div>
