@@ -95,3 +95,9 @@ export async function describeNetworks(countryIso: string, _apiKey: string): Pro
   const options = CATALOGUE[countryIso.toUpperCase()] ?? [];
   return options.length ? `réseaux catalogue pour ${countryIso.toUpperCase()} : ${options.map((o) => o.code).join(", ")}` : `aucun réseau au catalogue pour ${countryIso.toUpperCase()}`;
 }
+
+/** Opérateurs SasPay acceptés pour un pays, sous forme de valeurs à envoyer dans payment_method. */
+export function saspayOperatorsFor(countryIso: string): string[] {
+  const options = CATALOGUE[countryIso.toUpperCase()] ?? [];
+  return options.map((o) => o.label[0].toUpperCase());
+}
