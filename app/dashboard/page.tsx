@@ -2,10 +2,11 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowDownLeft, Code2, LayoutDashboard, Link2, Menu, Percent, Settings, Wallet } from "lucide-react";
+import { ArrowDownLeft, Code2, LayoutDashboard, Link2, Menu, Percent, Settings, TrendingUp, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ApiKeyManager from "@/components/api-key-manager";
 import TransactionsList from "@/components/transactions-list";
+import StatsView from "@/components/stats-view";
 import WalletOverview from "@/components/wallet-overview";
 import TestFunds from "@/components/test-funds";
 import WithdrawalsView from "@/components/withdrawals-view";
@@ -15,12 +16,14 @@ import VerificationBanner from "@/components/verification-banner";
 import AppSwitcher from "@/components/app-switcher";
 import SubscriptionsView from "@/components/subscriptions-view";
 import AccountMenu from "@/components/account-menu";
+import NotificationBell from "@/components/notification-bell";
 
 const sections = [
   { id: "overview", label: "Tableau de bord", icon: LayoutDashboard },
   { id: "wallet", label: "Portefeuille", icon: Wallet },
   { id: "transactions", label: "Transactions", icon: ArrowDownLeft },
   { id: "links", label: "Liens de paiement", icon: Link2 },
+  { id: "stats", label: "Statistiques", icon: TrendingUp },
   { id: "withdrawals", label: "Retraits", icon: Wallet },
   { id: "developers", label: "Développeurs", icon: Code2 },
   { id: "pricing", label: "Tarification", icon: Percent }, { id: "subs", label: "Abonnements", icon: Percent },
@@ -36,7 +39,6 @@ const styles = `
 
 function DashboardContent() {
   const [isAdmin, setIsAdmin] = useState(false);
-  const [bellOpen, setBellOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"app"|"verif"|"security">("app");
   const [autoWithdraw, setAutoWithdraw] = useState(false);
 
@@ -100,12 +102,13 @@ function DashboardContent() {
     <aside className={`dash-side ${menuOpen ? "open" : ""}`}><div className="dash-brand"><span className="dash-logo">f</span>flash<span style={{color:"#e8401f"}}>pay</span></div>{appId&&<AppSwitcher currentId={appId} onChange={(id)=>router.push(`${pathname}?app=${encodeURIComponent(id)}`)}/>}{isAdmin&&<a className="dash-nav" href="/admin" style={{marginBottom:10}}>Bureau d’administration</a>}{sections.map(({id,label,icon:Icon})=><button key={id} className={`dash-nav ${active===id?"active":""}`} onClick={()=>{setActive(id);setMenuOpen(false)}}><Icon size={18}/>{label}</button>)}<a className="dash-nav" href="/apps">← Mes applications</a>
     </aside>
     <div className={`dash-scrim ${menuOpen?"open":""}`} onClick={()=>setMenuOpen(false)}/><div className="dash-main">
-      <header className="dash-top"><button className="dash-menu" aria-label="Ouvrir le menu" onClick={()=>setMenuOpen(true)}><Menu size={20}/></button><button className="dash-bell" aria-label="Notifications" onClick={()=>setBellOpen(v=>!v)}>🔔</button>{bellOpen&&<div className="dash-bell-pop" role="status">Aucune notification pour l’instant.</div>}<AccountMenu onSettings={()=>setActive("settings")}/><button className="dash-plan" onClick={()=>setActive("subs")} aria-label="Voir les abonnements">Abonnements : {plan ? (plan.charAt(0).toUpperCase()+plan.slice(1)) : "aucun"}</button></header>
+      <header className="dash-top"><button className="dash-menu" aria-label="Ouvrir le menu" onClick={()=>setMenuOpen(true)}><Menu size={20}/></button><NotificationBell/><AccountMenu onSettings={()=>setActive("settings")}/><button className="dash-plan" onClick={()=>setActive("subs")} aria-label="Voir les abonnements">Abonnements : {plan ? (plan.charAt(0).toUpperCase()+plan.slice(1)) : "aucun"}</button></header>
       <div className="dash-content"><header className="dash-head"><h1>{currentSection.label}</h1>{appsError&&<p role="alert" className="dash-muted">{appsError}</p>}</header>
         {active==="overview"&&<VerificationBanner onOpenSettings={()=>{setSettingsTab("verif");setActive("settings")}}/>}
         {appId&&active==="overview"&&<><TestFunds appId={appId}/><WalletOverview appId={appId} autoWithdraw={false} onSubmitted={()=>setActive("withdrawals")}/></>}
         {appId&&active==="wallet"&&<><TestFunds appId={appId}/><WalletOverview appId={appId} autoWithdraw={autoWithdraw} onSubmitted={(mode)=>setActive(mode==="withdraw"?"withdrawals":"wallet")}/></>}
         {appId&&active==="transactions"&&<section className="dash-card"><h2>Toutes les transactions</h2><TransactionsList appId={appId}/></section>}
+        {appId&&active==="stats"&&<section className="dash-card"><h2>Statistiques</h2><StatsView appId={appId}/></section>}
         {appId&&active==="withdrawals"&&<WithdrawalsView appId={appId} onNew={()=>{setAutoWithdraw(true);setActive("wallet")}}/>}
         {appId&&active==="developers"&&<section className="dev-wrap">
           <div className="dev-tabs" role="tablist">
