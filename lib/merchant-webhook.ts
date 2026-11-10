@@ -34,6 +34,9 @@ export async function notifyMerchant(admin: SupabaseClient, transactionId: strin
   });
 
   const delays = [0, 2000, 6000];
+  let attempts = 0;
+  let lastStatus: number | null = null;
+  let delivered = false;
   for (const delay of delays) {
     if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
 
@@ -52,10 +55,31 @@ export async function notifyMerchant(admin: SupabaseClient, transactionId: strin
         signal: AbortSignal.timeout(10000),
         cache: "no-store",
       });
-      if (response.ok) return true;
+      attempts += 1;
+      lastStatus = response.status;
+      if (response.ok) {
+        delivered = true;
+        break;
+      }
     } catch {
+      attempts += 1;
       // Nouvelle tentative au tour suivant.
     }
   }
-  return false;
+
+  // Journal des envois : n'interrompt jamais l'envoi ni le paiement.
+  try {
+    await admin.from("webhook_deliveries").insert({
+      owner_id: tx.owner_id,
+      transaction_id: tx.transaction_id,
+      event: "transaction.successful",
+      url: hook.url,
+      attempts,
+      http_status: lastStatus,
+      success: delivered,
+    });
+  } catch {
+    // Journal indisponible : sans effet sur le paiement.
+  }
+  return delivered;
 }
