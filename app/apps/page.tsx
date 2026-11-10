@@ -116,8 +116,9 @@ export default function AppsPage() {
       if (loadError) setError("Impossible de charger tes applications.");
       const list = (data ?? []) as App[];
       setApps(list);
+      const manage = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("manage");
       const last = typeof window !== "undefined" ? localStorage.getItem("fp_last_app") : null;
-      if (list.length > 0 && (list.length === 1 || (last && list.some((x) => x.id === last)))) {
+      if (!manage && list.length > 0 && (list.length === 1 || (last && list.some((x) => x.id === last)))) {
         router.replace(`/dashboard?app=${encodeURIComponent(last && list.some((x) => x.id === last) ? last : list[0].id)}`);
         return;
       }
