@@ -107,6 +107,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     net_payable: Math.round((amount - fee) * 100) / 100,
     status: "pending",
     provider,
+    customer_name: name,
+    customer_phone: mobile,
   });
 
   if (insertError) {
