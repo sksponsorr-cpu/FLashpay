@@ -225,7 +225,8 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
 
       {open && (
         <div className="fp-modal-overlay" onClick={closeAction}>
-          <div className="fp-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <style>{`.fp-modal-pro{border-radius:26px;padding:26px 24px;max-width:440px;box-shadow:0 40px 80px -40px rgba(40,20,90,.45)}.fp-modal-pro .fp-input{height:52px;border-radius:14px;background:#faf8ff;border:1px solid #ebe6f3;padding:0 14px;font-size:15px}.fp-modal-pro .fp-field span{font-weight:700;font-size:14px;color:#1d1530}.fp-modal-pro .fp-form{gap:16px}.fp-modal-pro .fp-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fp-modal-pro .fp-btn{height:50px;border-radius:14px;font-weight:700}.fp-modal-pro .fp-close{width:40px;height:40px;border-radius:12px;background:#f3f0fb;border:0}`}</style>
+          <div className="fp-modal fp-modal-pro" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="fp-modal-head">
               <strong>{open.mode === "withdraw" ? "Demande de retrait" : "Demande de conversion"}</strong>
               <button type="button" className="fp-close" aria-label="Fermer" onClick={closeAction}>×</button>
