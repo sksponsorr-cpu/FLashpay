@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import ApiKeyManager from "@/components/api-key-manager";
 import TransactionsList from "@/components/transactions-list";
 import StatsView from "@/components/stats-view";
+import WebhookJournalView from "@/components/webhook-journal-view";
+import DisputesView from "@/components/disputes-view";
 import WalletOverview from "@/components/wallet-overview";
 import TestFunds from "@/components/test-funds";
 import WithdrawalsView from "@/components/withdrawals-view";
@@ -24,6 +26,8 @@ const sections = [
   { id: "transactions", label: "Transactions", icon: ArrowDownLeft },
   { id: "links", label: "Liens de paiement", icon: Link2 },
   { id: "stats", label: "Statistiques", icon: TrendingUp },
+  { id: "webhook-journal", label: "Journal des webhooks", icon: Code2 },
+  { id: "disputes", label: "Litiges", icon: Percent },
   { id: "withdrawals", label: "Retraits", icon: Wallet },
   { id: "developers", label: "Développeurs", icon: Code2 },
   { id: "pricing", label: "Tarification", icon: Percent }, { id: "subs", label: "Abonnements", icon: Percent },
@@ -109,6 +113,8 @@ function DashboardContent() {
         {appId&&active==="wallet"&&<><TestFunds appId={appId}/><WalletOverview appId={appId} autoWithdraw={autoWithdraw} onSubmitted={(mode)=>setActive(mode==="withdraw"?"withdrawals":"wallet")}/></>}
         {appId&&active==="transactions"&&<section className="dash-card"><h2>Toutes les transactions</h2><TransactionsList appId={appId}/></section>}
         {appId&&active==="stats"&&<section className="dash-card"><h2>Statistiques</h2><StatsView appId={appId}/></section>}
+        {appId&&active==="webhook-journal"&&<section className="dash-card"><h2>Journal des webhooks</h2><WebhookJournalView/></section>}
+        {appId&&active==="disputes"&&<section className="dash-card"><h2>Litiges</h2><DisputesView appId={appId}/></section>}
         {appId&&active==="withdrawals"&&<WithdrawalsView appId={appId} onNew={()=>{setAutoWithdraw(true);setActive("wallet")}}/>}
         {appId&&active==="developers"&&<section className="dev-wrap">
           <div className="dev-tabs" role="tablist">
