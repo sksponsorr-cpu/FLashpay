@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { FEE_SCHEDULE, clientRate } from "@/lib/fee-schedule";
+import { useEffect, useState } from "react";
+import { FEE_SCHEDULE, FLASHPAY_MARGIN_POINTS, clientRate } from "@/lib/fee-schedule";
 import { routeProvider } from "@/lib/payment-routing";
 
 // Code pays ISO pour chaque nom affiché, afin d'appliquer le même routage que les liens de paiement.
@@ -32,6 +32,13 @@ function modeLabel(countryName: string): string {
 }
 
 export default function PricingView() {
+  const [margin, setMargin] = useState(FLASHPAY_MARGIN_POINTS);
+  useEffect(() => {
+    fetch("/api/platform-settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => { if (typeof d.margin_points === "number") setMargin(d.margin_points); })
+      .catch(() => {});
+  }, []);
   const [open, setOpen] = useState<number | null>(0);
 
   return (
@@ -121,7 +128,8 @@ export default function PricingView() {
                       >
                         <span style={{ fontSize: 14, color: "#14142b", fontWeight: 600 }}>{n.network}</span>
                         <strong style={{ fontSize: 15, color: "#5b3fd6", textAlign: "right" }}>
-                          {clientRate(n.percent)}
+                          {clientRate(n.percent, margin)}
+                          <span style={{ display: "block", fontSize: 12, color: "#8a8aa3", fontWeight: 500 }}>SasPay {n.percent.toString().replace(".", ",")} %</span>
                           {n.extra ? <span style={{ color: "#6b6c80", fontWeight: 500 }}> {n.extra}</span> : null}
                         </strong>
                         {n.minimum ? <span style={{ fontSize: 12, color: "#8a8aa3" }}>Frais minimum : {n.minimum}</span> : <span />}
