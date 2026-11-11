@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
 
 // Fiche détaillée d'une transaction, ouverte depuis la liste. Feuille animée depuis le bas.
@@ -108,7 +109,10 @@ export default function TransactionDetail({ transactionId, onClose }: { transact
     </dl>
   );
 
-  return (
+  // Rendue directement dans <body> : évite qu'un parent (transform, overflow) ne masque la feuille.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <>
       <style>{CSS}</style>
       <div className="td-back" onClick={onClose} aria-hidden />
@@ -133,6 +137,7 @@ export default function TransactionDetail({ transactionId, onClose }: { transact
           </>
         )}
       </div>
-    </>
+    </>,
+    document.body
   );
 }
