@@ -90,7 +90,36 @@ export async function GET() {
   };
   const overview = { users: accounts.length, transactions: counts, withdrawals: withdrawalStats, merchants };
 
+  // Clients (profils), interwallet, références, support et bénéfice plateforme
+  const [profilesRes, movementsRes, txRefsRes, ticketsRes, paidWdRes, doneConvRes, okTxFeeRes] = await Promise.all([
+    admin.from("profiles").select("id,full_name,country_code,verification_status,created_at").order("created_at", { ascending: false }).limit(500),
+    admin.from("wallet_movements").select("id,owner_id,currency_code,kind,amount,balance_after,reference,created_at").in("kind", ["conversion_in", "conversion_out"]).order("created_at", { ascending: false }).limit(200),
+    admin.from("transactions").select("transaction_id,owner_id,amount,currency_code,status,country_code,payment_method,processing_fee,purpose,created_at").order("created_at", { ascending: false }).limit(200),
+    admin.from("support_tickets").select("id,owner_id,subject,message,status,created_at").eq("status", "open").order("created_at", { ascending: true }),
+    admin.from("withdrawal_requests").select("currency_code,fee_amount").eq("status", "paid").limit(10000),
+    admin.from("conversion_requests").select("from_currency,to_currency,amount,rate_applied,fee_rate").eq("status", "done").limit(10000),
+    admin.from("transactions").select("currency_code,processing_fee").eq("status", "successful").limit(10000),
+  ]);
+
+  const emailOf = new Map(accounts.map((a) => [a.id, a.email]));
+  const clients = (profilesRes.data ?? []).map((p) => ({ ...p, email: emailOf.get(p.id) ?? "" }));
+  const interwallet = (movementsRes.data ?? []).map((m) => ({ ...m, email: emailOf.get(m.owner_id) ?? "" }));
+  const references = (txRefsRes.data ?? []).map((t) => ({ ...t, email: emailOf.get(t.owner_id) ?? "" }));
+  const tickets = (ticketsRes.data ?? []).map((t) => ({ ...t, email: emailOf.get(t.owner_id) ?? "" }));
+
+  // Bénéfice plateforme par devise : frais d'encaissement + frais de retrait + marge de conversion.
+  const profit: Record<string, number> = {};
+  const addProfit = (currency: string, value: number) => { profit[currency] = (profit[currency] ?? 0) + value; };
+  for (const t of okTxFeeRes.data ?? []) addProfit(t.currency_code, Number(t.processing_fee ?? 0));
+  for (const w of paidWdRes.data ?? []) addProfit(w.currency_code, Number(w.fee_amount ?? 0));
+  for (const c of doneConvRes.data ?? []) {
+    const received = Number(c.amount) * Number(c.rate_applied ?? 0);
+    addProfit(c.to_currency, received * (Number(c.fee_rate ?? 0) / 100));
+  }
+
+  const { data: marginRow } = await admin.from("platform_settings").select("value").eq("key", "client_fee_margin_points").maybeSingle();
   return NextResponse.json({
+    margin_points: marginRow ? Number(marginRow.value) : 5,
     withdrawals: withdrawals.data,
     conversions: conversions.data,
     rates: rates.data,
@@ -98,10 +127,17 @@ export async function GET() {
     accounts,
     identities,
     overview,
+    clients,
+    interwallet,
+    references,
+    tickets,
+    profit,
   });
 }
 
 type AdminAction =
+  | { action: "set_margin"; points: number }
+  | { action: "close_ticket"; id: string }
   | { action: "mark_withdrawal_paid"; id: string }
   | { action: "reject_withdrawal"; id: string }
   | { action: "complete_conversion"; id: string; rate: number }
@@ -124,6 +160,15 @@ export async function POST(request: Request) {
 
   let result;
   switch (body.action) {
+    case "set_margin": {
+      const points = Number(body.points);
+      if (!Number.isFinite(points) || points < 0 || points > 50) return NextResponse.json({ message: "Marge invalide (0 à 50 points)." }, { status: 400 });
+      result = await serviceClient().from("platform_settings").upsert({ key: "client_fee_margin_points", value: points, updated_at: new Date().toISOString() });
+      break;
+    }
+    case "close_ticket":
+      result = await serviceClient().from("support_tickets").update({ status: "closed", closed_at: new Date().toISOString() }).eq("id", body.id);
+      break;
     case "mark_withdrawal_paid":
       result = await supabase.rpc("admin_mark_withdrawal_paid", { p_id: body.id });
       break;
@@ -176,6 +221,18 @@ export async function POST(request: Request) {
 
   if (result.error) {
     return NextResponse.json({ message: result.error.message || "Action refusée." }, { status: 400 });
+  }
+
+  // Journal : qui a fait quoi, et quand (jamais bloquant).
+  try {
+    const { data: who } = await supabase.auth.getUser();
+    await serviceClient().from("admin_audit_log").insert({
+      admin_email: who.user?.email ?? null,
+      action: body.action,
+      payload: body as unknown as Record<string, unknown>,
+    });
+  } catch {
+    // Le journal ne doit jamais bloquer une action validée.
   }
 
   return NextResponse.json({ ok: true, result: result.data ?? null });
