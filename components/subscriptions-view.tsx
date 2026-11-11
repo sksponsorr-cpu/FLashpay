@@ -1,19 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { OPERATOR_ICONS, operatorsFor } from "@/lib/operators";
 
 // Montants d'abonnement (identiques à la route /api/subscribe)
 const plans = [
   { id: "none", name: "Sans abonnement", price: "", rate: "6 %", text: "Chaque encaissement est facturé 6 %. Aucun engagement." },
   { id: "basic", name: "Basic", price: "10 000 FCFA / mois", rate: "1 %", text: "1 % sur les encaissements mensuels jusqu’à 200 000 FCFA, puis 6 %." },
   { id: "premium", name: "Premium", price: "25 000 FCFA / mois", rate: "1 %", text: "1 % jusqu’à 500 000 FCFA encaissés par mois, puis 6 %." },
-];
-const operators = [
-  { id: "MTN MoMo", icon: "📱" },
-  { id: "Orange Money", icon: "🟠" },
-  { id: "Moov Money", icon: "🔵" },
-  { id: "Wave", icon: "🌊" },
-  { id: "Airtel Money", icon: "🔴" },
 ];
 // Pays où Orange Money exige un code OTP
 const ORANGE_OTP_COUNTRIES = ["CI", "SN", "BF"];
@@ -97,7 +91,7 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
 
   function goNext() {
     if (step === 1 && !country) return setMessage("Choisis ton pays.");
-    if (step === 2 && !operator) return setMessage("Choisis ton opérateur.");
+    if (step === 2 && (!operator || !operatorsFor(country).includes(operator))) return setMessage("Choisis ton opérateur.");
     if (step === 3 && (!name.trim() || !mobile.trim())) return setMessage("Indique ton nom et ton numéro.");
     if (step === 3 && needsOtp && !otp.trim()) return setMessage("Saisis le code OTP de ton compte Orange Money.");
     setMessage("");
@@ -217,7 +211,7 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
                 <p className="ck-sub">Choisis le pays où se trouve ton compte mobile money.</p>
                 <div className="ck-grid">
                   {countries.map((c) => (
-                    <button key={c.code} className={`ck-tile${country === c.code ? " on" : ""}`} onClick={() => setCountry(c.code)}>
+                    <button key={c.code} className={`ck-tile${country === c.code ? " on" : ""}`} onClick={() => { setCountry(c.code); setOperator(""); }}>
                       <span className="ck-ico">🌍</span><strong>{c.name}</strong><span className="ck-tick">✓</span>
                     </button>
                   ))}
@@ -230,11 +224,12 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
                 <h2>Ton opérateur</h2>
                 <p className="ck-sub">{countryName} · choisis le moyen de paiement.</p>
                 <div className="ck-grid">
-                  {operators.map((o) => (
-                    <button key={o.id} className={`ck-tile${operator === o.id ? " on" : ""}`} onClick={() => setOperator(o.id)}>
-                      <span className="ck-ico">{o.icon}</span><strong>{o.id}</strong><span className="ck-tick">✓</span>
+                  {operatorsFor(country).map((o) => (
+                    <button key={o} className={`ck-tile${operator === o ? " on" : ""}`} onClick={() => setOperator(o)}>
+                      <span className="ck-ico">{OPERATOR_ICONS[o] ?? "💳"}</span><strong>{o}</strong><span className="ck-tick">✓</span>
                     </button>
                   ))}
+                  {operatorsFor(country).length === 0 && <p className="ck-sub">Aucun moyen de paiement mobile disponible pour ce pays.</p>}
                 </div>
               </div>
             )}

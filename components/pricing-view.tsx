@@ -1,45 +1,45 @@
 "use client";
 
 import { useState } from "react";
-import { FEE_SCHEDULE, FLASHPAY_MARGIN_POINTS, clientRate } from "@/lib/fee-schedule";
+import { FEE_SCHEDULE, clientRate } from "@/lib/fee-schedule";
+import { routeProvider } from "@/lib/payment-routing";
 
-// Formules Flash Pay (inchangées).
-const plans = [
-  { name: "Sans abonnement", rate: "6 %", note: "Par encaissement, sans engagement." },
-  { name: "Basic", rate: "1 %", note: "Sur les encaissements mensuels jusqu’à 200 000 FCFA, puis 6 %.", featured: true },
-  { name: "Premium", rate: "1 %", note: "Jusqu’à 500 000 FCFA encaissés par mois, puis 6 %." },
-];
+// Code pays ISO pour chaque nom affiché, afin d'appliquer le même routage que les liens de paiement.
+const ISO_BY_NAME: Record<string, string> = {
+  "République démocratique du Congo": "CD",
+  "Congo-Brazzaville": "CG",
+  Cameroun: "CM",
+  "Côte d’Ivoire": "CI",
+  "Burkina Faso": "BF",
+  Bénin: "BJ",
+  Mali: "ML",
+  Ghana: "GH",
+  Kenya: "KE",
+  Nigeria: "NG",
+  Rwanda: "RW",
+  Sénégal: "SN",
+  Tanzanie: "TZ",
+  Ouganda: "UG",
+  "Sierra Leone": "SL",
+  Togo: "TG",
+  Zambie: "ZM",
+};
+
+function modeLabel(countryName: string): string {
+  const iso = ISO_BY_NAME[countryName];
+  if (!iso) return "Lien de paiement";
+  return routeProvider(iso) === "saspay" ? "Paiement direct" : "Lien de paiement";
+}
 
 export default function PricingView() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
     <div style={{ display: "grid", gap: 22 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 }}>
-        {plans.map((p) => (
-          <div
-            key={p.name}
-            style={{
-              background: "#fff",
-              borderRadius: 22,
-              padding: "20px 22px",
-              border: p.featured ? "1.5px solid #5b3fd6" : "1px solid #f0eef8",
-              boxShadow: p.featured ? "0 14px 34px rgba(91,63,214,.14)" : "0 1px 0 rgba(20,20,43,.04), 0 10px 28px rgba(20,20,43,.05)",
-              display: "grid",
-              gap: 8,
-            }}
-          >
-            <span style={{ fontSize: 13, fontWeight: 700, color: p.featured ? "#5b3fd6" : "#8a8aa3", letterSpacing: ".04em", textTransform: "uppercase" }}>{p.name}</span>
-            <strong style={{ fontSize: 32, fontWeight: 700, color: "#14142b", letterSpacing: "-.02em" }}>{p.rate}</strong>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "#6b6c80" }}>{p.note}</p>
-          </div>
-        ))}
-      </div>
-
       <div style={{ display: "grid", gap: 4 }}>
         <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "#14142b", letterSpacing: "-.01em" }}>Frais par pays et par réseau</h2>
         <p style={{ margin: "0 0 10px", fontSize: 13, color: "#8a8aa3", lineHeight: 1.5 }}>
-          Le client paie ces frais en plus du montant. Marge Flash Pay incluse : +{FLASHPAY_MARGIN_POINTS} point.
+          Frais appliqués à chaque encaissement selon le pays et le réseau de paiement.
         </p>
       </div>
 
@@ -77,7 +77,7 @@ export default function PricingView() {
               >
                 <span style={{ display: "grid", gap: 2 }}>
                   <strong style={{ fontSize: 15, color: "#14142b" }}>{c.country}</strong>
-                  <span style={{ fontSize: 12, color: "#8a8aa3" }}>{c.currency} · {c.networks.length} réseau{c.networks.length > 1 ? "x" : ""}</span>
+                  <span style={{ fontSize: 12, color: "#8a8aa3" }}>{c.currency} · {c.networks.length} réseau{c.networks.length > 1 ? "x" : ""} · {modeLabel(c.country)}</span>
                 </span>
                 <span
                   aria-hidden
@@ -124,8 +124,7 @@ export default function PricingView() {
                           {clientRate(n.percent)}
                           {n.extra ? <span style={{ color: "#6b6c80", fontWeight: 500 }}> {n.extra}</span> : null}
                         </strong>
-                        <span style={{ fontSize: 12, color: "#8a8aa3" }}>Frais minimum : {n.minimum}</span>
-                        <span style={{ fontSize: 12, color: "#8a8aa3", textAlign: "right" }}>SasPay {n.percent.toString().replace(".", ",")} %{n.extra ? ` ${n.extra}` : ""}</span>
+                        {n.minimum ? <span style={{ fontSize: 12, color: "#8a8aa3" }}>Frais minimum : {n.minimum}</span> : <span />}
                       </div>
                     ))}
                   </div>
@@ -136,12 +135,6 @@ export default function PricingView() {
         })}
       </div>
 
-      <div style={{ background: "#f4f1ff", borderRadius: 18, padding: "16px 20px", display: "grid", gap: 4 }}>
-        <strong style={{ fontSize: 15, color: "#14142b" }}>Le client paie les frais en plus</strong>
-        <span style={{ fontSize: 14, color: "#6b6c80", lineHeight: 1.5 }}>
-          Ce supplément est affiché à ton client au moment du paiement. Il ne réduit pas ce que tu reçois.
-        </span>
-      </div>
     </div>
   );
 }
