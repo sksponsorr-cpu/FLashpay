@@ -95,11 +95,11 @@ export function localMobile(countryCode: string, mobile: string): string {
  * Montant final envoyé au prestataire. Avec clientFee, le client paie 2,5 % de plus.
  * Renvoie un entier pour les devises sans décimales.
  */
-export function computeTotal(amount: number, countryCode: string, clientFee: boolean): number {
+export function computeTotal(amount: number, countryCode: string, clientFee: boolean, rate: number = CLIENT_FEE_RATE): number {
   const currency = CURRENCY_BY_COUNTRY[countryCode.toUpperCase()] ?? "";
   const decimal = DECIMAL_CURRENCIES.has(currency);
   const round = (v: number) => (decimal ? Math.round(v * 100) / 100 : Math.ceil(v));
-  return round(clientFee ? amount * (1 + CLIENT_FEE_RATE) : amount);
+  return round(clientFee ? amount * (1 + rate) : amount);
 }
 
 type ApiResult = { ok: true; data: Record<string, unknown> } | { ok: false; message: string; status?: number };
