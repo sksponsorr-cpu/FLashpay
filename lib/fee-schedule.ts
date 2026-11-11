@@ -2,15 +2,12 @@
 // Source : tableau SasPay « Encaissement » (mode « ajoutés », payé par le client en plus du montant).
 // Les frais affichés à l'client = frais SasPay + marge FlashPay.
 
-// Marge FlashPay ajoutée à chaque réseau, en points de pourcentage.
-// À ajuster ici uniquement : toute la page tarification se met à jour.
-export const FLASHPAY_MARGIN_POINTS = 5;
 
 export type NetworkFee = {
   network: string;
   percent: number;          // frais SasPay en %
   extra?: string;           // frais fixe ou complément (ex. « + 100 XOF »)
-  minimum: string;          // frais minimum, tel qu'affiché par SasPay
+  minimum?: string;         // frais minimum, tel qu'affiché par SasPay (omis si inconnu)
 };
 
 export type CountryFees = {
@@ -97,10 +94,73 @@ export const FEE_SCHEDULE: CountryFees[] = [
       { network: "MTN MoMo Rwanda", percent: 4.7, minimum: "25 RWF" },
     ],
   },
+  // Pays sans taux SasPay renseigné : 5,5 % appliqué. Minimum non connu : non affiché.
+  {
+    country: "Cameroun", currency: "XAF",
+    networks: [
+      { network: "MTN MoMo Cameroun", percent: 5.5 },
+      { network: "Orange Money Cameroun", percent: 5.5 },
+      { network: "Airtel Money Cameroun", percent: 5.5 },
+    ],
+  },
+  {
+    country: "Congo-Brazzaville", currency: "XAF",
+    networks: [
+      { network: "MTN MoMo Congo", percent: 5.5 },
+      { network: "Airtel Money Congo-Brazzaville", percent: 5.5 },
+    ],
+  },
+  {
+    country: "Côte d’Ivoire", currency: "XOF",
+    networks: [
+      { network: "Orange Money Côte d’Ivoire", percent: 5.5 },
+      { network: "MTN MoMo Côte d’Ivoire", percent: 5.5 },
+      { network: "Moov Money Côte d’Ivoire", percent: 5.5 },
+      { network: "Wave Côte d’Ivoire", percent: 5.5 },
+    ],
+  },
+  {
+    country: "Burkina Faso", currency: "XOF",
+    networks: [
+      { network: "Orange Money Burkina Faso", percent: 5.5 },
+      { network: "Moov Money Burkina Faso", percent: 5.5 },
+    ],
+  },
+  {
+    country: "Bénin", currency: "XOF",
+    networks: [
+      { network: "MTN MoMo Bénin", percent: 5.5 },
+      { network: "Moov Money Bénin", percent: 5.5 },
+    ],
+  },
+  {
+    country: "Mali", currency: "XOF",
+    networks: [
+      { network: "Orange Money Mali", percent: 5.5 },
+      { network: "Moov Money Mali", percent: 5.5 },
+    ],
+  },
+  {
+    country: "Ghana", currency: "GHS",
+    networks: [
+      { network: "MTN MoMo Ghana", percent: 5.5 },
+      { network: "Vodafone Cash", percent: 5.5 },
+    ],
+  },
+  {
+    country: "Kenya", currency: "KES",
+    networks: [
+      { network: "M-Pesa Kenya", percent: 5.5 },
+      { network: "Airtel Money Kenya", percent: 5.5 },
+    ],
+  },
+  {
+    country: "Nigeria", currency: "NGN",
+    networks: [{ network: "Virement bancaire", percent: 5.5 }],
+  },
 ];
 
-/** Taux affiché au client : frais SasPay + marge FlashPay, arrondi à deux décimales. */
+/** Taux affiché : le taux réseau réel, sans marge. */
 export function clientRate(percent: number): string {
-  const total = Math.round((percent + FLASHPAY_MARGIN_POINTS) * 100) / 100;
-  return `${total.toString().replace(".", ",")} %`;
+  return `${percent.toString().replace(".", ",")} %`;
 }
