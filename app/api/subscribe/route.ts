@@ -5,6 +5,9 @@ import { getSupportedCountry } from "@/lib/countries";
 import { createSwychrPaymentRequest, resolvePaymentMethod } from "@/lib/swychr";
 import { createClient } from "@/lib/supabase/server";
 
+// Taux appliqué pour les abonnements en RDC (1 XOF = 3,2323 CDF).
+const XOF_TO_CDF = 3.2323;
+
 const PLANS: Record<string, { amount: number; label: string }> = {
   basic: { amount: 10000, label: "Basic" },
   premium: { amount: 25000, label: "Premium" },
@@ -41,12 +44,14 @@ export async function POST(request: Request) {
   if (!plan) return NextResponse.json({ message: "Plan Basic ou Premium invalide." }, { status: 400 });
 
   const country = getSupportedCountry(body.country_code?.trim().toUpperCase());
-  if (!country || !["XAF", "XOF"].includes(country.currency)) {
+  if (!country || !["XAF", "XOF", "CDF"].includes(country.currency)) {
     return NextResponse.json(
-      { message: "Les abonnements sont disponibles uniquement en FCFA." },
+      { message: "Les abonnements sont disponibles en FCFA et en CDF." },
       { status: 400 }
     );
   }
+
+  const chargeAmount = country.currency === "CDF" ? Math.round(plan.amount * XOF_TO_CDF) : plan.amount;
 
   if (!body.mobile?.trim() || !body.payment_method?.trim()) {
     return NextResponse.json({ message: "Numéro et opérateur obligatoires." }, { status: 400 });
@@ -75,10 +80,10 @@ export async function POST(request: Request) {
     transaction_id: transactionId,
     country_code: country.code,
     payment_method: paymentMethod,
-    amount: plan.amount,
+    amount: chargeAmount,
     currency_code: country.currency,
     processing_fee: 0,
-    net_payable: plan.amount,
+    net_payable: chargeAmount,
     status: "pending",
     environment: "live",
     purpose: "subscription",
@@ -108,7 +113,7 @@ export async function POST(request: Request) {
       email: user.email || undefined,
       mobile: body.mobile,
       transaction_id: transactionId,
-      amount: plan.amount,
+      amount: chargeAmount,
       payment_method: paymentMethod,
       description: `Abonnement FlashPay ${plan.label}`,
       clientFee: false,
@@ -127,7 +132,7 @@ export async function POST(request: Request) {
     data: {
       transaction_id: transactionId,
       plan: body.plan,
-      amount: plan.amount,
+      amount: chargeAmount,
       currency: country.currency,
       payment_link: paymentRequest.paymentLink,
     },
