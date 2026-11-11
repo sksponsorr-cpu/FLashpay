@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import WithdrawStepper from "@/components/withdraw-stepper";
 
 type Wallet = { currency_code: string; balance: number };
 type Movement = { id: string; currency_code: string; kind: string; amount: number; created_at: string };
@@ -156,6 +157,21 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
     }
   }
 
+  async function submitWithdraw(currency: string, amount: number, dest: { country_code: string; operator: string; mobile: string; name: string }) {
+    const response = await fetch("/api/withdrawals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "schedule", currency_code: currency, amount, destination: dest }),
+    });
+    const result = await response.json();
+    if (!response.ok || result.ok === false) throw new Error(result.message ?? "Demande refusée.");
+    setOpen(null);
+    setNoticeOk(true);
+    setNotice(result.message ?? "Retrait enregistré.");
+    await load();
+    onSubmitted?.("withdraw");
+  }
+
   if (error) return <p className="fp-muted">{error}</p>;
   if (!data) return <p className="fp-muted">Chargement des portefeuilles…</p>;
 
@@ -225,17 +241,24 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
 
       {open && (
         <div className="fp-modal-overlay" onClick={closeAction}>
-          <style>{`.fp-modal-pro{border-radius:26px;padding:26px 24px;max-width:440px;box-shadow:0 40px 80px -40px rgba(40,20,90,.45)}.fp-modal-pro .fp-input{height:52px;border-radius:14px;background:#faf8ff;border:1px solid #ebe6f3;padding:0 14px;font-size:15px}.fp-modal-pro .fp-field span{font-weight:700;font-size:14px;color:#1d1530}.fp-modal-pro .fp-form{gap:16px}.fp-modal-pro .fp-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fp-modal-pro .fp-btn{height:50px;border-radius:14px;font-weight:700}.fp-modal-pro .fp-close{width:40px;height:40px;border-radius:12px;background:#f3f0fb;border:0}`}</style>
-          <div className="fp-modal fp-modal-pro" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <div className="fp-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="fp-modal-head">
-              <strong>{open.mode === "withdraw" ? "Demande de retrait" : "Demande de conversion"}</strong>
+              <strong>{open.mode === "withdraw" ? "Retirer vers mobile money" : "Demande de conversion"}</strong>
               <button type="button" className="fp-close" aria-label="Fermer" onClick={closeAction}>×</button>
             </div>
             <p className="fp-muted">
               Solde disponible : {fmt(data.wallets.find((w) => w.currency_code === open.currency)?.balance ?? 0)} {open.currency}
             </p>
-            <form className="fp-form" onSubmit={submit}>
-              {open.mode === "convert" && (
+
+            {open.mode === "withdraw" ? (
+              <WithdrawStepper
+                currency={open.currency}
+                minimum={Number(minimum(open.currency) ?? 0)}
+                available={data.wallets.find((w) => w.currency_code === open.currency)?.balance ?? 0}
+                onSubmit={(amt, dest) => submitWithdraw(open.currency, amt, dest)}
+              />
+            ) : (
+              <form className="fp-form" onSubmit={submit}>
                 <label className="fp-field">
                   <span>Vers la devise</span>
                   <select className="fp-input" value={toCurrency} onChange={(e) => setToCurrency(e.target.value)} required>
@@ -245,47 +268,18 @@ export default function WalletOverview({ appId, onSubmitted, autoWithdraw = fals
                     ))}
                   </select>
                 </label>
-              )}
-
-              {open.mode === "withdraw" && (
-                <>
-                  <label className="fp-field">
-                    <span>Pays de réception</span>
-                    <select className="fp-input" value={country} onChange={(e) => { setCountry(e.target.value); setOperator(""); }} required>
-                      <option value="">Choisir un pays</option>
-                      {destinationOptions.map(([code, d]) => <option key={code} value={code}>{d.name}</option>)}
-                    </select>
-                  </label>
-                  <label className="fp-field">
-                    <span>Opérateur mobile money</span>
-                    <select className="fp-input" value={operator} onChange={(e) => setOperator(e.target.value)} required disabled={!country}>
-                      <option value="">Choisir un opérateur</option>
-                      {operatorOptions.map((o) => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  </label>
-                  <label className="fp-field">
-                    <span>Numéro qui recevra l’argent</span>
-                    <input className="fp-input" inputMode="tel" placeholder="ex. 812345678" value={mobile} onChange={(e) => setMobile(e.target.value)} required />
-                  </label>
-                  <label className="fp-field">
-                    <span>Nom du bénéficiaire</span>
-                    <input className="fp-input" placeholder="Nom complet" value={name} onChange={(e) => setName(e.target.value)} required />
-                  </label>
-                </>
-              )}
-
-              <label className="fp-field">
-                <span>Montant en {open.currency}</span>
-                <input className="fp-input" inputMode="decimal" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-              </label>
-              <div className="fp-actions">
-                <button className="fp-btn" disabled={busy || !amount}>{busy ? "Envoi…" : "Confirmer"}</button>
-                <button className="fp-btn fp-btn-ghost" type="button" onClick={closeAction}>Annuler</button>
-              </div>
-            </form>
+                <label className="fp-field">
+                  <span>Montant en {open.currency}</span>
+                  <input className="fp-input" inputMode="decimal" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                </label>
+                <div className="fp-actions">
+                  <button className="fp-btn" disabled={busy || !amount || !toCurrency}>{busy ? "Envoi…" : "Confirmer"}</button>
+                  <button className="fp-btn fp-btn-ghost" type="button" onClick={closeAction}>Annuler</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
-    </div>
   );
 }

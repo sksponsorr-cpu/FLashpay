@@ -7,6 +7,7 @@ export default function AccountMenu({ onSettings }: { onSettings: () => void }) 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -14,6 +15,8 @@ export default function AccountMenu({ onSettings }: { onSettings: () => void }) 
       const supabase = createClient();
       const { data } = await supabase.auth.getUser();
       if (!alive || !data.user) return;
+      const { data: prof } = await supabase.from("profiles").select("avatar_url").eq("id", data.user.id).maybeSingle();
+      if (alive && prof?.avatar_url) setAvatar(prof.avatar_url as string);
       setEmail(data.user.email ?? "");
       const meta = data.user.user_metadata as { full_name?: string } | undefined;
       setName(meta?.full_name ?? (data.user.email ?? "").split("@")[0]);
@@ -32,7 +35,7 @@ export default function AccountMenu({ onSettings }: { onSettings: () => void }) 
   return (
     <div className="am-wrap">
       <button className="am-btn" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        <span className="am-avatar">{initials}</span>
+        <span className="am-avatar">{avatar ? <img src={avatar} alt="" width={32} height={32} style={{ borderRadius: "50%", objectFit: "cover" }} /> : initials}</span>
         <span className="am-chev">{open ? "▴" : "▾"}</span>
       </button>
       {open && (

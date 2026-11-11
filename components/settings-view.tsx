@@ -13,11 +13,10 @@ const verifLabel: Record<string, string> = {
   rejected: "Refusé",
 };
 
-export default function SettingsView({ appId, initialTab = "app" }: { appId: string; initialTab?: "app" | "verif" | "security" | "profile" }) {
-  const [tab, setTab] = useState<"app" | "verif" | "security" | "profile">(initialTab);
-  const [email, setEmail] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [profileMsg, setProfileMsg] = useState("");
+import AvatarUpload from "@/components/avatar-upload";
+
+export default function SettingsView({ appId, initialTab = "app" }: { appId: string; initialTab?: "app" | "verif" | "security" }) {
+  const [tab, setTab] = useState<"app" | "verif" | "security">(initialTab);
   const [app, setApp] = useState<App | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
@@ -38,11 +37,6 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
         setName(a.name);
         setWebsite(a.website ?? "");
         setCategory(a.category);
-      }
-      const { data: userData } = await supabase.auth.getUser();
-      if (alive && userData.user) {
-        setEmail(userData.user.email ?? "");
-        setFullName(String(userData.user.user_metadata?.full_name ?? ""));
       }
       const { data: profile } = await supabase.from("profiles").select("verification_status").single();
       if (alive) setStatus(profile?.verification_status ?? null);
@@ -72,12 +66,6 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
     }
   }
 
-  async function saveProfile() {
-    setProfileMsg("");
-    const { error } = await createClient().auth.updateUser({ data: { full_name: fullName.trim() } });
-    setProfileMsg(error ? "Impossible d’enregistrer le profil." : "Profil enregistré.");
-  }
-
   async function signOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -86,11 +74,11 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
 
   return (
     <section className="set-wrap">
+      <AvatarUpload />
 
       <div className="dev-tabs" role="tablist">
-        <button role="tab" aria-selected={tab === "app"} className={tab === "app" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("app")}>Entreprise</button>
-        <button role="tab" aria-selected={tab === "verif"} className={tab === "verif" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("verif")}>KYC</button>
-        <button role="tab" aria-selected={tab === "profile"} className={tab === "profile" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("profile")}>Profil</button>
+        <button role="tab" aria-selected={tab === "app"} className={tab === "app" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("app")}>Application</button>
+        <button role="tab" aria-selected={tab === "verif"} className={tab === "verif" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("verif")}>Vérification</button>
         <button role="tab" aria-selected={tab === "security"} className={tab === "security" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("security")}>Sécurité</button>
       </div>
 
@@ -129,19 +117,6 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
               <IdentityForm onSubmitted={() => { setRejection(null); setStatus("under_review"); }} />
             </>
           )}
-        </div>
-      )}
-
-      {tab === "profile" && (
-        <div className="dash-card set-card">
-          <label className="set-field"><span>Nom complet</span>
-            <input className="set-input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          </label>
-          <label className="set-field"><span>Email</span>
-            <input className="set-input" value={email} disabled />
-          </label>
-          <button className="primary-button" onClick={() => void saveProfile()}>Enregistrer</button>
-          {profileMsg && <p className="dash-muted" role="status">{profileMsg}</p>}
         </div>
       )}
 
