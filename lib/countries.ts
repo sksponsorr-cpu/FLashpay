@@ -12,6 +12,10 @@ export const SUPPORTED_COUNTRIES = [
   { code: "ML", name: "Mali", currency: "XOF" },
   { code: "GH", name: "Ghana", currency: "GHS" },
   { code: "KE", name: "Kenya", currency: "KES" },
+  { code: "TZ", name: "Tanzanie", currency: "TZS" },
+  { code: "UG", name: "Ouganda", currency: "UGX" },
+  { code: "SL", name: "Sierra Leone", currency: "SLE" },
+  { code: "ZM", name: "Zambie", currency: "ZMW" },
 ] as const;
 
 export type SupportedCountryCode = (typeof SUPPORTED_COUNTRIES)[number]["code"];
