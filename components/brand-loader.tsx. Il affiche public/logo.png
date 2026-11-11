@@ -1,0 +1,15 @@
+"use client";
+
+// Écran de chargement : le logo FlashPay clignote doucement.
+// Déposer le logo dans public/logo.png (ou changer src).
+export default function BrandLoader({ src = "/logo.png", size = 72 }: { src?: string; size?: number }) {
+  return (
+    <div style={{ display: "grid", placeItems: "center", minHeight: "40vh" }}>
+      <img src={src} alt="FlashPay" width={size} height={size} style={{ animation: "fpBlink 1.4s ease-in-out infinite" }} />
+      <style>{`
+        @keyframes fpBlink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.96); } }
+        @media (prefers-reduced-motion: reduce) { img { animation: none !important; } }
+      `}</style>
+    </div>
+  );
+}
