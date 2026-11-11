@@ -160,7 +160,16 @@ export const FEE_SCHEDULE: CountryFees[] = [
   },
 ];
 
-/** Taux affiché : le taux réseau réel, sans marge. */
-export function clientRate(percent: number): string {
-  return `${percent.toString().replace(".", ",")} %`;
+// Marge FlashPay ajoutée au taux du réseau (SasPay), en points.
+// Le taux affiché ET le frais réellement prélevé au client = taux réseau + marge.
+export const FLASHPAY_MARGIN_POINTS = 5;
+
+/** Taux client : taux du réseau + marge FlashPay, arrondi à deux décimales. */
+export function clientPercent(networkPercent: number, margin: number = FLASHPAY_MARGIN_POINTS): number {
+  return Math.round((networkPercent + margin) * 100) / 100;
+}
+
+/** Taux client affiché (« 9,7 % »). */
+export function clientRate(networkPercent: number, margin: number = FLASHPAY_MARGIN_POINTS): string {
+  return `${clientPercent(networkPercent, margin).toString().replace(".", ",")} %`;
 }
