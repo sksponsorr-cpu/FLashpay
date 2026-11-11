@@ -42,7 +42,7 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
       .select("code,name,currency_code")
       .order("name")
       .then(({ data }) => {
-        if (data) setCountries((data as Country[]).filter((c) => c.currency_code === "XAF" || c.currency_code === "XOF"));
+        if (data) setCountries(data as Country[]);
       });
   }, []);
 
