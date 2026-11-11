@@ -206,6 +206,34 @@ export async function POST(request: Request) {
           "Paiement abonnement confirmé :",
           attributes.transaction_id
         );
+
+        // Notification au marchand : son abonnement est activé.
+        try {
+          const { data: subTx } = await admin
+            .from("transactions")
+            .select("owner_id, amount, currency_code")
+            .eq("transaction_id", attributes.transaction_id)
+            .maybeSingle();
+          const { data: subPay } = await admin
+            .from("subscription_payments")
+            .select("plan")
+            .eq("transaction_id", attributes.transaction_id)
+            .maybeSingle();
+          if (subTx?.owner_id) {
+            const planLabel = subPay?.plan
+              ? subPay.plan.charAt(0).toUpperCase() + subPay.plan.slice(1)
+              : "Abonnement";
+            await admin.from("user_notifications").insert({
+              owner_id: subTx.owner_id,
+              kind: "subscription",
+              title: `Abonnement ${planLabel} activé`,
+              body: `Paiement de ${subTx.amount} ${subTx.currency_code} confirmé.`,
+              reference: attributes.transaction_id,
+            });
+          }
+        } catch (subscriptionNoticeError) {
+          console.error("Subscription notification error:", subscriptionNoticeError);
+        }
       }
     }
 
