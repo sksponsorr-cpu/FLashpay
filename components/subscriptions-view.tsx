@@ -75,6 +75,13 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
   const chosen = plans.find((p) => p.id === choice);
   const countryName = countries.find((c) => c.code === country)?.name ?? "";
   const needsOtp = operator === "Orange Money" && ORANGE_OTP_COUNTRIES.includes(country);
+  const isCdf = countries.find((c) => c.code === country)?.currency_code === "CDF";
+  // Prix affiché : en CDF pour la RDC, avec le même taux que le serveur.
+  const priceOf = (p: { id: string; price: string }) => {
+    if (!p.price || !isCdf) return p.price;
+    const xof = p.id === "premium" ? 25000 : 10000;
+    return `${Math.round(xof * 3.2323).toLocaleString("fr-FR")} CDF / mois`;
+  };
 
   function open(id: string) {
     setChoice(id);
@@ -197,7 +204,7 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
         <div className="ck-back" onClick={close}>
           <div className="ck" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="ck-top">
-              <strong>Abonnement {chosen.name} · {chosen.price}</strong>
+              <strong>Abonnement {chosen.name} · {priceOf(chosen)}</strong>
               <button className="ck-x" onClick={close} aria-label="Fermer">×</button>
             </div>
             <div className="ck-dots">
@@ -262,7 +269,7 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
                   <div><span>Pays</span><strong>{countryName}</strong></div>
                   <div><span>Opérateur</span><strong>{operator}</strong></div>
                   <div><span>Numéro</span><strong>{mobile}</strong></div>
-                  <div><span>Montant</span><strong className="ck-total">{chosen.price}</strong></div>
+                  <div><span>Montant</span><strong className="ck-total">{priceOf(chosen)}</strong></div>
                 </div>
               </div>
             )}
@@ -273,7 +280,7 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
               {step < 4 && <button className="ck-btn" onClick={goNext}>Continuer</button>}
               {step === 4 && !done && (
                 <button className="ck-btn" disabled={busy} onClick={() => void pay()}>
-                  {busy ? "Paiement…" : `Payer ${chosen.price}`}
+                  {busy ? "Paiement…" : `Payer ${priceOf(chosen)}`}
                 </button>
               )}
               {done && <button className="ck-btn" onClick={close}>Terminé</button>}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import TransactionDetail from "@/components/transaction-detail";
 
 // Liste des encaissements en direct. Mise en page autonome (aucune classe CSS externe requise).
 type Row = {
@@ -57,6 +58,7 @@ export default function TransactionsList({ appId }: { appId: string }) {
   const [currency, setCurrency] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,7 +163,7 @@ export default function TransactionsList({ appId }: { appId: string }) {
         {visible.map((row) => {
           const s = statusStyle[row.status] ?? { bg: "#f0eef8", fg: "#6b6c80" };
           return (
-            <div key={row.transaction_id} style={{ display: "flex", justifyContent: "space-between", gap: 12, background: "#fff", borderRadius: 18, padding: "16px 18px", border: "1px solid #f0eef8", boxShadow: "0 1px 0 rgba(20,20,43,.04)" }}>
+            <button type="button" key={row.transaction_id} onClick={() => setSelected(row.transaction_id)} style={{ display: "flex", justifyContent: "space-between", gap: 12, width: "100%", font: "inherit", textAlign: "left", cursor: "pointer", background: "#fff", borderRadius: 18, padding: "16px 18px", border: "1px solid #f0eef8", boxShadow: "0 1px 0 rgba(20,20,43,.04)" }}>
               <div style={{ display: "grid", gap: 4, minWidth: 0 }}>
                 <strong style={{ fontSize: 15, color: "#14142b" }}>{row.purpose === "subscription" ? "Abonnement" : "Encaissement"}</strong>
                 <span style={{ fontSize: 12, color: "#8a8aa3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.transaction_id}</span>
@@ -176,10 +178,11 @@ export default function TransactionsList({ appId }: { appId: string }) {
                   {statusLabel[row.status] ?? row.status}
                 </span>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
+      {selected && <TransactionDetail transactionId={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

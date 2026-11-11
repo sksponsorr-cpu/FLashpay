@@ -5,9 +5,9 @@ type Item = { id: string; kind: string; title: string; body: string; read_at: st
 
 const css = `
 .nb{position:relative}
-.nb-btn{position:relative;width:46px;height:46px;border-radius:14px;border:1px solid #ebe6f3;background:#fff;font-size:18px;cursor:pointer;display:grid;place-items:center}
+.nb-btn{position:relative;width:46px;height:46px;border-radius:14px;border:1px solid #ebe6f3;background:#fff;color:#1d1530;cursor:pointer;display:grid;place-items:center}
 .nb-badge{position:absolute;top:-5px;right:-5px;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:#6236d6;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
-.nb-pop{position:absolute;right:0;top:54px;width:min(340px,88vw);max-height:420px;overflow:auto;background:#fff;border:1px solid #ebe6f3;border-radius:18px;box-shadow:0 24px 50px -24px rgba(40,20,90,.35);z-index:50}
+.nb-pop{position:fixed;top:72px;right:12px;width:min(360px,calc(100vw - 24px));max-height:70vh;overflow:auto;background:#fff;border:1px solid #ebe6f3;border-radius:18px;box-shadow:0 24px 50px -24px rgba(40,20,90,.35);z-index:200;animation:nb-in .25s cubic-bezier(.2,.8,.2,1) both}@keyframes nb-in{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
 .nb-head{padding:14px 16px;border-bottom:1px solid #f1edf7;color:#1d1530}
 .nb-empty{margin:0;padding:22px 16px;color:#6f6a7d;font-size:14px}
 .nb-item{display:grid;gap:3px;padding:12px 16px;border-bottom:1px solid #f6f3fa;color:#1d1530;font-size:14px}
@@ -66,7 +66,7 @@ export default function NotificationBell() {
     <div className="nb" ref={ref}>
       <style>{css}</style>
       <button className="nb-btn" aria-label="Notifications" onClick={() => void toggle()}>
-        🔔
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
         {unread > 0 && <span className="nb-badge">{unread > 9 ? "9+" : unread}</span>}
       </button>
       {open && (

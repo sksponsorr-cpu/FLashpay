@@ -1,11 +1,23 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 // Photo de profil : affichée en haut de l'écran.
 export default function AvatarUpload({ current }: { current?: string | null }) {
   const [url, setUrl] = useState<string | null>(current ?? null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle();
+      if (alive && data?.avatar_url) setUrl(data.avatar_url as string);
+    })();
+    return () => { alive = false; };
+  }, []);
 
   async function onPick(file: File) {
     setBusy(true);
@@ -19,6 +31,7 @@ export default function AvatarUpload({ current }: { current?: string | null }) {
       const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
       await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
       setUrl(publicUrl);
+      window.dispatchEvent(new CustomEvent("fp:avatar", { detail: publicUrl }));
     }
     setBusy(false);
   }

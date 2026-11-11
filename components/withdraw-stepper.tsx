@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import CountryPicker from "@/components/country-picker";
 
 type Dest = {
   country_code: string;
@@ -173,57 +174,27 @@ export default function WithdrawStepper({
 
       {step === 0 && (
         <div style={{ display: "grid", gap: 10 }}>
-          <label>Pays de destination</label>
 
-          <select
-            style={field}
+          <CountryPicker
+            label="Pays de destination"
+            placeholder="Choisir un pays"
             value={dest.country_code}
-            onChange={(e) =>
-              setDest({
-                ...dest,
-                country_code: e.target.value,
-                operator: "",
-              })
-            }
-          >
-            <option value="">Choisir un pays</option>
-
-            {COUNTRIES.map((country) => (
-              <option
-                key={country.code}
-                value={country.code}
-              >
-                {country.name}
-              </option>
-            ))}
-          </select>
+            options={COUNTRIES.map((c) => ({ value: c.code, label: c.name }))}
+            onChange={(v) => setDest({ ...dest, country_code: v, operator: "" })}
+          />
         </div>
       )}
 
       {step === 1 && (
         <div style={{ display: "grid", gap: 10 }}>
-          <label>Réseau de paiement</label>
 
-          <select
-            style={field}
+          <CountryPicker
+            label="Réseau de paiement"
+            placeholder="Choisir un réseau"
             value={dest.operator}
-            onChange={(e) =>
-              setDest({
-                ...dest,
-                operator: e.target.value,
-              })
-            }
-          >
-            <option value="">Choisir un réseau</option>
-
-            {(OPERATORS[dest.country_code] ?? []).map(
-              (operator) => (
-                <option key={operator} value={operator}>
-                  {operator}
-                </option>
-              )
-            )}
-          </select>
+            options={(OPERATORS[dest.country_code] ?? []).map((o) => ({ value: o, label: o }))}
+            onChange={(v) => setDest({ ...dest, operator: v })}
+          />
 
           <label>Numéro de réception</label>
 

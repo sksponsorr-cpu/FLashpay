@@ -24,6 +24,12 @@ export default function AccountMenu({ onSettings }: { onSettings: () => void }) 
     return () => { alive = false; };
   }, []);
 
+  useEffect(() => {
+    const onAvatar = (e: Event) => setAvatar((e as CustomEvent<string>).detail);
+    window.addEventListener("fp:avatar", onAvatar);
+    return () => window.removeEventListener("fp:avatar", onAvatar);
+  }, []);
+
   async function signOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
