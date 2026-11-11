@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { OPERATOR_ICONS, operatorsFor } from "@/lib/operators";
+import { callingCodeFor, normalizeMobile } from "@/lib/calling-codes";
 
 // Montants d'abonnement (identiques à la route /api/subscribe)
 const plans = [
@@ -243,9 +244,12 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
                   <label htmlFor="ck-name">Ton nom</label>
                 </div>
                 <div className="ck-field">
-                  <input id="ck-mob" placeholder=" " inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} />
+                  <input id="ck-mob" placeholder=" " inputMode="tel" value={mobile} onChange={(e) => setMobile(normalizeMobile(e.target.value))} />
                   <label htmlFor="ck-mob">Ton numéro mobile</label>
                 </div>
+                <p className="ck-sub" style={{ marginTop: -4 }}>
+                  Saisis le numéro sans l’indicatif. Pour {country ? (countries.find((c) => c.code === country)?.name ?? "ce pays") : "ce pays"}, l’indicatif {callingCodeFor(country) || "du pays"} est ajouté automatiquement.
+                </p>
                 {needsOtp && (
                   <div className="ck-field">
                     <input id="ck-otp" placeholder=" " inputMode="numeric" value={otp} onChange={(e) => setOtp(e.target.value)} />

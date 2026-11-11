@@ -60,6 +60,7 @@ const CSS = `
 @keyframes nb-up{from{transform:translateY(100%)}to{transform:none}}
 @keyframes nb-pop2{from{opacity:0;transform:translate(-50%,50%) scale(.96)}to{opacity:1;transform:translate(-50%,50%)}}
 @keyframes nb-fade{from{opacity:0}to{opacity:1}}
+@media(max-width:719px){.nb-panel{position:fixed;left:14px;right:14px;top:78px;width:auto;max-height:70vh}}
 @media(prefers-reduced-motion:reduce){.nb *{animation:none!important;transition:none!important}}
 `;
 

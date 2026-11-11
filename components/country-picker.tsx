@@ -10,7 +10,7 @@ const CSS = `
 .cp-trigger span.cp-ph{color:#9a95aa}
 .cp-trigger i{font-style:normal;color:#5b3fd6;font-size:18px}
 .cp-back{position:fixed;inset:0;z-index:130;background:rgba(20,20,43,.35);backdrop-filter:blur(3px);animation:cp-fade .25s ease both}
-.cp-sheet{position:fixed;left:0;right:0;bottom:0;max-height:82vh;display:flex;flex-direction:column;background:#fff;border-radius:26px 26px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:0 -20px 50px rgba(20,20,43,.18);animation:cp-up .42s cubic-bezier(.2,.8,.2,1) both}
+.cp-sheet{position:fixed;z-index:140;left:0;right:0;bottom:0;max-height:82vh;display:flex;flex-direction:column;background:#fff;border-radius:26px 26px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:0 -20px 50px rgba(20,20,43,.18);animation:cp-up .42s cubic-bezier(.2,.8,.2,1) both}
 @media(min-width:720px){.cp-sheet{left:50%;right:auto;bottom:50%;width:min(480px,calc(100vw - 40px));max-height:76vh;transform:translate(-50%,50%);border-radius:26px;animation:cp-pop .3s cubic-bezier(.2,.8,.2,1) both}}
 .cp-grab{width:40px;height:4px;margin:0 auto 12px;border-radius:99px;background:#e0ddea}
 .cp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
