@@ -9,6 +9,7 @@ import {
 } from "@/lib/swychr";
 import { createSaspayPayment } from "@/lib/saspay";
 import { routeProvider } from "@/lib/payment-routing";
+import { clientFeeFor } from "@/lib/client-fees";
 import { liveGate } from "@/lib/live-gate";
 import { minimumFor } from "@/lib/payment-minimums";
 
@@ -73,11 +74,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
 
   const provider = routeProvider(link.country_code); // automatique par pays
   const amount = Number(link.amount);
-  const total = computeTotal(amount, link.country_code, true);
 
-  // Montant minimum par devise, vérifié avant tout appel au prestataire
+  // Frais client = taux du réseau choisi (grille SasPay), ajoutés au montant.
   const { data: countryRow } = await admin.from("supported_countries").select("currency_code").eq("code", link.country_code).maybeSingle();
   const currency = countryRow?.currency_code ?? link.currency_code;
+  const { data: marginRow } = await admin.from("platform_settings").select("value").eq("key", "client_fee_margin_points").maybeSingle();
+  const margin = marginRow ? Number(marginRow.value) : 5;
+  const clientFee = clientFeeFor(link.country_code, operator, currency, margin);
+  const feeRate = clientFee.percent / 100;
+  const feeAmount = clientFee.minimum !== null ? Math.max(amount * feeRate, clientFee.minimum) : amount * feeRate;
+  const total = computeTotal(amount, link.country_code, true, feeAmount / amount);
+
+  // Montant minimum par devise, vérifié avant tout appel au prestataire
   const min = minimumFor(currency);
   if (min !== null && total < min) {
     return NextResponse.json(
