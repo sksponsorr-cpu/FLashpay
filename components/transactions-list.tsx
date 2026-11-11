@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+// Liste des encaissements en direct. Mise en page autonome (aucune classe CSS externe requise).
 type Row = {
   transaction_id: string;
   amount: number;
@@ -21,6 +22,13 @@ const statusLabel: Record<string, string> = {
   expired: "Expiré",
   cancelled: "Annulé",
 };
+const statusStyle: Record<string, { bg: string; fg: string }> = {
+  pending: { bg: "#fff4e0", fg: "#8a5a00" },
+  successful: { bg: "#e7f7ef", fg: "#0f7a47" },
+  failed: { bg: "#fdecea", fg: "#c8321a" },
+  expired: { bg: "#f0eef8", fg: "#6b6c80" },
+  cancelled: { bg: "#f0eef8", fg: "#6b6c80" },
+};
 const filters: { value: string; label: string }[] = [
   { value: "all", label: "Tous" },
   { value: "successful", label: "Réussi" },
@@ -29,6 +37,17 @@ const filters: { value: string; label: string }[] = [
   { value: "expired", label: "Expiré" },
   { value: "cancelled", label: "Annulé" },
 ];
+
+const field: React.CSSProperties = {
+  padding: "11px 14px",
+  borderRadius: 14,
+  border: "1px solid #ebe8f7",
+  background: "#fbfaff",
+  font: "inherit",
+  fontSize: 14,
+  color: "#14142b",
+  minWidth: 0,
+};
 
 export default function TransactionsList({ appId }: { appId: string }) {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -43,8 +62,7 @@ export default function TransactionsList({ appId }: { appId: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const supabase = createClient();
-        const { data, error: queryError } = await supabase
+        const { data, error: queryError } = await createClient()
           .from("transactions")
           .select("transaction_id,amount,currency_code,net_payable,status,purpose,created_at")
           .eq("app_id", appId)
@@ -93,60 +111,75 @@ export default function TransactionsList({ appId }: { appId: string }) {
     URL.revokeObjectURL(url);
   }
 
-  if (error) return <p className="tx-msg tx-error">{error}</p>;
-  if (!rows) return <p className="tx-msg">Chargement…</p>;
+  if (error) return <p style={{ color: "#c8321a", fontSize: 15 }}>{error}</p>;
+  if (!rows) return <p style={{ color: "#6b6c80", fontSize: 15 }}>Chargement…</p>;
 
   return (
-    <div className="tx-wrap">
+    <div style={{ display: "grid", gap: 16 }}>
       <input
-        className="tx-search"
         type="search"
         placeholder="Rechercher une référence"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        style={{ ...field, width: "100%" }}
       />
-      <div className="tx-toolbar">
-        <select className="tx-select" aria-label="Devise" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+        <select aria-label="Devise" value={currency} onChange={(e) => setCurrency(e.target.value)} style={field}>
           <option value="all">Toutes les devises</option>
           {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <label className="tx-date-field">Du <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label className="tx-date-field">Au <input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
-        <button className="tx-export" onClick={exportCsv} disabled={!visible.length}>Exporter</button>
-      </div>
-      <div className="tx-pills" role="tablist">
-        {filters.map((f) => (
-          <button
-            key={f.value}
-            role="tab"
-            aria-selected={status === f.value}
-            className={status === f.value ? "tx-pill on" : "tx-pill"}
-            onClick={() => setStatus(f.value)}
-          >
-            {f.label}
-          </button>
-        ))}
+        <label style={{ ...field, display: "flex", gap: 8, alignItems: "center" }}>Du <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ border: 0, background: "transparent", font: "inherit" }} /></label>
+        <label style={{ ...field, display: "flex", gap: 8, alignItems: "center" }}>Au <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ border: 0, background: "transparent", font: "inherit" }} /></label>
+        <button type="button" onClick={exportCsv} disabled={!visible.length} style={{ ...field, background: "#5b3fd6", color: "#fff", border: 0, fontWeight: 700, cursor: visible.length ? "pointer" : "not-allowed", opacity: visible.length ? 1 : .5 }}>
+          Exporter
+        </button>
       </div>
 
-      {!rows.length && <p className="tx-msg">Aucune transaction pour cette application.</p>}
-      {rows.length > 0 && !visible.length && <p className="tx-msg">Aucune transaction ne correspond à ce filtre.</p>}
+      <div role="tablist" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {filters.map((f) => {
+          const on = status === f.value;
+          return (
+            <button
+              key={f.value}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => setStatus(f.value)}
+              style={{ padding: "8px 14px", borderRadius: 999, border: "1px solid #ebe8f7", background: on ? "#14142b" : "#fff", color: on ? "#fff" : "#14142b", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
 
-      {visible.map((row) => (
-        <div className="tx-row" key={row.transaction_id}>
-          <div className="tx-main">
-            <strong>{row.purpose === "subscription" ? "Abonnement" : "Encaissement"}</strong>
-            <span className="tx-ref">{row.transaction_id}</span>
-            <span className="tx-date">
-              {new Date(row.created_at).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-            </span>
-          </div>
-          <div className="tx-side">
-            <strong>{fmt(row.amount)} {row.currency_code}</strong>
-            {row.purpose !== "subscription" && <span className="tx-net">Net : {fmt(row.net_payable)}</span>}
-            <span className={`tx-badge tx-${row.status}`}>{statusLabel[row.status] ?? row.status}</span>
-          </div>
-        </div>
-      ))}
+      {!rows.length && <p style={{ color: "#8a8aa3", fontSize: 14, margin: 0 }}>Aucune transaction pour cette application.</p>}
+      {rows.length > 0 && !visible.length && <p style={{ color: "#8a8aa3", fontSize: 14, margin: 0 }}>Aucune transaction ne correspond à ce filtre.</p>}
+
+      <div style={{ display: "grid", gap: 10 }}>
+        {visible.map((row) => {
+          const s = statusStyle[row.status] ?? { bg: "#f0eef8", fg: "#6b6c80" };
+          return (
+            <div key={row.transaction_id} style={{ display: "flex", justifyContent: "space-between", gap: 12, background: "#fff", borderRadius: 18, padding: "16px 18px", border: "1px solid #f0eef8", boxShadow: "0 1px 0 rgba(20,20,43,.04)" }}>
+              <div style={{ display: "grid", gap: 4, minWidth: 0 }}>
+                <strong style={{ fontSize: 15, color: "#14142b" }}>{row.purpose === "subscription" ? "Abonnement" : "Encaissement"}</strong>
+                <span style={{ fontSize: 12, color: "#8a8aa3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.transaction_id}</span>
+                <span style={{ fontSize: 12, color: "#8a8aa3" }}>
+                  {new Date(row.created_at).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+              <div style={{ display: "grid", gap: 6, justifyItems: "end", textAlign: "right", flexShrink: 0 }}>
+                <strong style={{ fontSize: 15, color: "#14142b" }}>{fmt(row.amount)} {row.currency_code}</strong>
+                {row.purpose !== "subscription" && <span style={{ fontSize: 12, color: "#8a8aa3" }}>Net : {fmt(row.net_payable)}</span>}
+                <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 999, background: s.bg, color: s.fg }}>
+                  {statusLabel[row.status] ?? row.status}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
