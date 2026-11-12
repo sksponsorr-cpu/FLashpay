@@ -1,87 +1,81 @@
 # Documentation développeur FlashPay
 
-FlashPay permet à ton application (SaaS) de demander des encaissements par mobile money (MTN, Orange…) dans plusieurs pays d'Afrique.
+FlashPay permet à ton application de demander des encaissements par mobile money dans plusieurs pays d'Afrique.
 
-Cette documentation explique **ce qui est disponible aujourd'hui**, **comment obtenir une clé**, **comment appeler l'API** et **comment recevoir les confirmations de paiement**.
+Ce document décrit ce qui existe dans l'API aujourd'hui, tel qu'il est implémenté.
 
 ---
 
-## 1. Ce qui est disponible aujourd'hui
+## 1. Disponibilité
 
 | Fonctionnalité | Statut |
 |---|---|
-| Créer un compte FlashPay | ✅ Disponible |
-| Créer une clé **test** (`fp_test_…`) | ✅ Disponible |
-| Appeler l'API de **collecte test** (`POST /api/v1/collections`) | ✅ Disponible |
-| Enregistrement des transactions test, avec commission calculée | ✅ Disponible |
-| Limite de 60 requêtes par minute et par clé | ✅ Disponible |
-| Révoquer une clé | ✅ Disponible |
-| Notifications de paiement réussi vers ton application (webhook) | ✅ Disponible (à configurer dans la rubrique Développeurs) |
-| Créer une clé **live** (`fp_live_…`) | ⏳ Pas encore ouverte |
-| Encaissements réels (argent réel) | ⏳ Pas encore ouverts |
-| Versements automatiques aux bénéficiaires | ❌ Non prévu dans cette version |
-
-**En clair** : tu peux intégrer et tester l'API complètement, mais **aucun argent réel n'est encaissé tant que les clés live ne sont pas ouvertes**. Elles seront activées après validation de ton compte.
+| Créer une clé **test** (`fp_test_…`) | Disponible |
+| Créer une clé **live** (`fp_live_…`) | Disponible, mais les encaissements live sont activés par FlashPay après vérification du compte |
+| Créer un encaissement (`POST /api/v1/collections`) | Disponible |
+| Consulter un encaissement (`GET /api/v1/collections/{transactionId}`) | Disponible |
+| Lister les moyens de paiement d'un pays (`GET /api/v1/payment-methods`) | Disponible |
+| Notifications de paiement réussi (webhook) | Disponible, à configurer dans la rubrique Développeurs |
+| Révoquer une clé | Disponible (propriétaire de l'application uniquement) |
+| Versements automatiques aux bénéficiaires | Non disponible dans l'API |
 
 ---
 
-## 2. Obtenir une clé de test
+## 2. Obtenir une clé
 
-1. Crée un compte sur FlashPay, puis connecte-toi.
-2. Ouvre la rubrique **Développeurs** dans le tableau de bord.
-3. Donne un nom à ton intégration (par exemple « Mon SaaS - staging »), puis clique sur **Créer une clé test**.
-4. **Copie la clé immédiatement.** Elle ne sera plus jamais affichée. FlashPay ne garde que sa version chiffrée.
+1. Connecte-toi au tableau de bord FlashPay.
+2. Ouvre la rubrique **Développeurs**, choisis l'application concernée.
+3. Crée une clé, donne-lui un nom, puis copie-la immédiatement : le secret complet n'est affiché qu'une seule fois.
 
-Une clé test commence par `fp_test_`. Elle ne peut déclencher **aucun paiement réel**.
+Une clé test commence par `fp_test_`. Une clé live commence par `fp_live_`.
 
-### Règles de sécurité
-- Garde la clé **sur ton serveur**, dans une variable d'environnement.
-- Ne l'écris **jamais** dans du code côté navigateur (JavaScript, application mobile).
+**Règles de sécurité**
+- Garde la clé sur ton serveur, dans une variable d'environnement.
+- Ne l'écris jamais dans du code exécuté par le navigateur ou une application mobile.
 - Ne la commite jamais dans Git.
-- Si une clé est exposée, **révoque-la** immédiatement dans la rubrique Développeurs, puis crées-en une nouvelle.
+- En cas d'exposition, révoque-la aussitôt et crées-en une nouvelle.
 
 ---
 
 ## 3. Authentification
 
-Chaque requête doit contenir ta clé dans l'en-tête HTTP `X-FlashPay-Key` :
+Chaque requête envoie la clé dans l'en-tête :
 
 ```
 X-FlashPay-Key: fp_test_xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
+Une clé absente, invalide ou révoquée renvoie `401`.
+
 ---
 
-## 4. Créer une collecte
+## 4. Créer un encaissement
 
-### Requête
+`POST /api/v1/collections`
 
-**Méthode et adresse** : `POST https://<adresse-de-flashpay>/api/v1/collections`
+En-têtes : `Content-Type: application/json` et `X-FlashPay-Key`.
 
-**En-têtes** :
-- `Content-Type: application/json`
-- `X-FlashPay-Key: <ta clé>`
-
-**Corps (JSON)** :
+### Corps de la requête
 
 | Champ | Obligatoire | Description |
 |---|---|---|
-| `country_code` | Oui | Code pays à deux lettres (voir la liste en section 6) |
-| `amount` | Oui | Montant strictement supérieur à 0, dans la devise du pays. C'est le montant **demandé** : le payeur voit ce montant + 2,5 % de frais. |
-| `mobile` | Oui | Numéro mobile du payeur **sans l'indicatif** du pays (ex. `670000000` pour le Cameroun). |
-| `name` | Oui | Nom du payeur |
-| `transaction_id` | Non | Ta référence unique. Si absente, FlashPay en génère une. |
-| `payment_method` | Oui en live | Opérateur, par exemple `MTN` ou `ORANGE`. |
-| `email` | Non | Email du payeur |
-| `description` | Non | Libellé affiché au payeur. Par défaut : « Collecte FlashPay ». |
-| `pass_digital_charge` | Non | Par défaut `true` : les frais de 2,5 % sont payés par le payeur. |
-| `callback_url` | Non | Adresse vers laquelle le payeur revient après paiement réussi. |
-| `failed_callback_url` | Non | Adresse vers laquelle le payeur revient en cas d'échec. |
+| `country_code` | Oui | Code pays ISO à deux lettres (section 7). |
+| `amount` | Oui | Montant supérieur à zéro, dans la devise du pays. |
+| `name` | Oui | Nom du payeur. |
+| `mobile` | Oui | Numéro mobile du payeur, sans l'indicatif du pays. |
+| `payment_method` | Oui en live | Moyen de paiement (voir `GET /api/v1/payment-methods`). |
+| `transaction_id` | Non | Ta référence. FlashPay en génère une si elle est absente. |
+| `checkout` | Non | `"hosted"` : FlashPay héberge la page de paiement (voir ci-dessous). |
+| `description` | Non | Libellé affiché au payeur. |
+| `email` | Non | E-mail du payeur. |
+| `pass_digital_charge` | Non | `false` : le client ne paie pas les frais (section 8). Par défaut, il les paie. |
+| `callback_url` | Non | Adresse vers laquelle le payeur revient après un paiement réussi. |
+| `failed_callback_url` | Non | Adresse vers laquelle le payeur revient après un échec. |
 
-**Exemple** :
+### Exemple
 
 ```javascript
-// À exécuter UNIQUEMENT sur ton serveur
+// À exécuter uniquement côté serveur
 const response = await fetch("https://<adresse-de-flashpay>/api/v1/collections", {
   method: "POST",
   headers: {
@@ -97,11 +91,10 @@ const response = await fetch("https://<adresse-de-flashpay>/api/v1/collections",
     payment_method: "MTN",
   }),
 });
-
 const result = await response.json();
 ```
 
-### Réponse en cas de succès (`200`) — clé test
+### Réponse — clé test (`200`)
 
 ```json
 {
@@ -115,12 +108,12 @@ const result = await response.json();
     "status": "pending",
     "platform_fee": 1500,
     "net_payable": 23500,
-    "message": "Collecte de test enregistrée. Aucun appel à Swychr et aucun mouvement de fonds n’ont eu lieu."
+    "message": "Collecte de test enregistrée. Aucun appel au prestataire et aucun mouvement de fonds n’ont eu lieu."
   }
 }
 ```
 
-### Réponse en cas de succès (`200`) — clé live (quand elle sera ouverte)
+### Réponse — clé live (`200`)
 
 ```json
 {
@@ -140,22 +133,47 @@ const result = await response.json();
 }
 ```
 
-Redirige le client vers `payment_link` pour qu'il finalise le paiement sur son téléphone.
+### Mode hébergé (`checkout: "hosted"`)
 
-**Signification des champs** :
-- `status` : `pending` = en attente. Il passe à `successful` une fois le paiement confirmé. Tu seras prévenu par notification (section 5).
-- `platform_fee` : commission FlashPay de 6 % du montant demandé, calculée automatiquement.
-- `net_payable` : montant que tu reçois après la commission FlashPay (montant demandé − 6 %).
+Avec `checkout: "hosted"`, FlashPay crée un lien de paiement et renvoie `checkout_url`. Redirige ton client vers cette adresse : il choisit son opérateur et valide le paiement sur son téléphone.
+
+```json
+{
+  "mode": "hosted",
+  "data": {
+    "transaction_id": "…",
+    "checkout_url": "https://<adresse-de-flashpay>/pay/…",
+    "currency_code": "XAF",
+    "message": "Redirige ton client vers checkout_url. Il choisit son opérateur et valide sur son téléphone."
+  }
+}
+```
+
+Dans ce mode, le montant affiché au client sur la page de paiement inclut les frais du moyen de paiement choisi (section 8).
+
+### Champs de la réponse
+
+- `status` : `pending` pendant la validation, puis `successful` une fois le paiement confirmé. Tu es prévenu par notification (section 5).
+- `platform_fee` : commission FlashPay de 6 % du montant demandé.
+- `net_payable` : montant que tu reçois, soit le montant demandé moins la commission.
 
 ---
 
-## 5. Notifications de paiement (webhook)
+## 5. Consulter un encaissement
 
-Quand un paiement passe à `successful`, FlashPay envoie une requête `POST` à l'adresse https que tu as enregistrée dans la rubrique **Développeurs**, section **Notifications vers ton application**.
+`GET /api/v1/collections/{transactionId}`
 
-**Au moment de l'enregistrement de l'adresse**, FlashPay affiche un **secret** une seule fois. Copie-le et garde-le sur ton serveur.
+Renvoie l'état de l'encaissement. La clé utilisée doit appartenir à l'application qui l'a créé.
 
-**Corps de la notification** :
+---
+
+## 6. Notifications de paiement (webhook)
+
+Quand un paiement passe à `successful`, FlashPay envoie une requête `POST` à l'adresse https que tu as enregistrée dans la rubrique Développeurs.
+
+**Secret** : au moment de l'enregistrement de l'adresse, FlashPay affiche un secret une seule fois. Garde-le sur ton serveur.
+
+**Corps** :
 
 ```json
 {
@@ -173,33 +191,27 @@ Quand un paiement passe à `successful`, FlashPay envoie une requête `POST` à 
 }
 ```
 
-**En-têtes envoyés** :
-- `X-FlashPay-Timestamp` : date d'envoi (en secondes)
-- `X-FlashPay-Signature` : signature HMAC-SHA256 de `timestamp + "." + corps`, avec ton secret
+**En-têtes** :
+- `X-FlashPay-Timestamp` : date d'envoi, en secondes depuis l'époque Unix.
+- `X-FlashPay-Signature` : HMAC-SHA256 en hexadécimal de `timestamp + "." + corps brut`, avec ton secret.
 
-**Vérification côté serveur** : recalcule la signature avec ton secret et compare-la à `X-FlashPay-Signature`. Refuse la notification si elle ne correspond pas. Tu peux aussi refuser toute notification dont le timestamp date de plus de 5 minutes.
+**Vérification** (à faire avant tout traitement) :
 
-**Réessais** : si ton serveur ne répond pas, FlashPay réessaie après 2 s puis 6 s (3 tentatives au total). Rends ton traitement **idempotent** : une même `transaction_id` peut arriver plusieurs fois.
+1. Recalcule `HMAC-SHA256(secret, "<timestamp>.<corps brut>")` en hexadécimal.
+2. Compare-le à `X-FlashPay-Signature` avec une comparaison à temps constant.
+3. Refuse la requête si le timestamp a plus de 5 minutes d'écart avec ton horloge.
 
----
-
-## 6. Codes d'erreur
-
-| Code | Signification | Que faire |
-|---|---|---|
-| `400` | Données invalides (pays inconnu, montant nul, champs manquants) | Corrige le corps de la requête |
-| `401` | Clé absente, invalide ou révoquée | Vérifie la clé, ou crées-en une nouvelle |
-| `403` | Action non autorisée | Vérifie le type de clé |
-| `409` | Le `transaction_id` existe déjà | Utilise une référence unique |
-| `429` | Plus de 60 requêtes par minute | Attends une minute, puis réessaie |
-| `502` | Le prestataire de paiement n'a pas accepté la demande | Réessaie plus tard. La transaction reste en attente chez FlashPay. |
-| `503` | Service temporairement indisponible, ou clé live pas encore ouverte | Réessaie plus tard |
-
-Toutes les erreurs renvoient un message lisible au format :
-
-```json
-{ "message": "Description de l’erreur." }
+```js
+const crypto = require("crypto");
+function isValid(rawBody, signature, timestamp, secret) {
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+  const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
+  const a = Buffer.from(signature), b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 ```
+
+**Réessais** : si ton serveur ne répond pas, FlashPay renvoie la notification à 2 s, puis à 6 s après le premier envoi, soit 3 tentatives au total. Ton traitement doit être idempotent : utilise `transaction_id` comme clé, car une même notification peut arriver plusieurs fois.
 
 ---
 
@@ -208,55 +220,74 @@ Toutes les erreurs renvoient un message lisible au format :
 | Code | Pays | Devise |
 |---|---|---|
 | CM | Cameroun | XAF |
-| CD | RDC | CDF |
 | CG | Congo-Brazzaville | XAF |
+| CD | RDC | CDF |
 | SN | Sénégal | XOF |
 | BF | Burkina Faso | XOF |
 | BJ | Bénin | XOF |
-| NG | Nigeria | NGN |
-| RW | Rwanda | RWF |
+| ML | Mali | XOF |
 | CI | Côte d’Ivoire | XOF |
 | TG | Togo | XOF |
-| ML | Mali | XOF |
+| NG | Nigeria | NGN |
 | GH | Ghana | GHS |
 | KE | Kenya | KES |
+| RW | Rwanda | RWF |
 
-Être dans cette liste ne garantit pas que tous les opérateurs sont disponibles pour ton compte.
+Les moyens de paiement disponibles dépendent du pays et de ton compte : interroge `GET /api/v1/payment-methods?country_code=…`.
 
 ---
 
 ## 8. Frais
 
-- **Commission FlashPay** : **6 %** du montant demandé, pour toutes les devises. Elle est calculée et enregistrée automatiquement.
-- **Frais de paiement** : **2,5 %**, payés par le **payeur**. Le client paie donc le montant demandé + 2,5 %. Tu reçois le montant demandé, moins la commission FlashPay.
+**Commission FlashPay** : 6 % du montant demandé, prélevée sur ce que tu reçois. Elle est calculée et enregistrée automatiquement (`platform_fee`).
 
-Exemple pour une collecte de 25 000 FCFA :
-- Le payeur paie : 25 000 + 2,5 % = **25 625 FCFA**
-- Commission FlashPay (6 %) : **1 500 FCFA**
-- Tu reçois : **23 500 FCFA**
+**Frais payés par le client** : ils sont identiques sur la page hébergée (`checkout_url`) et sur l'appel direct. Le client paie le taux affiché dans la tarification FlashPay pour le moyen de paiement choisi, c'est-à-dire le taux du réseau plus la marge FlashPay, avec le minimum du réseau quand il s'applique.
 
-Ces taux peuvent changer. Tu seras informé avant toute modification.
+Le montant exact est toujours affiché au client avant validation.
 
----
+**Exemple** : collecte de 25 000 FCFA au Cameroun, avec le taux actuel de la tarification (10,5 % = 5,5 % + 5 points de marge, sous réserve de mise à jour de la grille) :
+- Le client paie : 25 000 + 10,5 % = 27 625 FCFA.
+- Commission FlashPay (6 %) : 1 500 FCFA.
+- Tu reçois : 23 500 FCFA.
 
-## 9. Limites
-
-- **60 requêtes par minute et par clé.** Au-delà, la réponse est `429`.
-- Les requêtes de test sont enregistrées, mais ne déclenchent aucun paiement réel.
+Le paramètre `pass_digital_charge: false` désactive les frais client : le client paie alors exactement le montant demandé.
 
 ---
 
-## 10. Passer en production
+## 9. Codes d'erreur
 
-Les clés live ne sont pas encore ouvertes. Avant leur ouverture, FlashPay finalise :
-- la vérification d'identité de ton compte,
-- l'accord écrit du prestataire de paiement pour l'encaissement,
-- un premier test réel, de petit montant, contrôlé par FlashPay.
+| Code | Signification |
+|---|---|
+| `400` | Données invalides (pays inconnu, montant nul, champs manquants) |
+| `401` | Clé absente, invalide ou révoquée |
+| `403` | Action non autorisée pour cette clé |
+| `409` | `transaction_id` déjà utilisé |
+| `429` | Trop de requêtes pour cette clé. Réessaie après le délai indiqué dans `Retry-After`. |
+| `502` | Le prestataire de paiement n’a pas accepté la demande. La transaction reste en attente. |
+| `503` | Service temporairement indisponible, ou fonctionnalité pas encore activée |
 
-Quand ces étapes seront terminées, cette documentation sera mise à jour avec la procédure complète.
+Toutes les erreurs renvoient :
+
+```json
+{ "message": "Description lisible de l’erreur." }
+```
 
 ---
 
-## 11. Support
+## 10. Limites
 
-En cas de problème, indique le `transaction_id`, le code d'erreur et l'heure de la requête. N'envoie jamais ta clé complète : seuls les 15 premiers caractères suffisent pour l'identifier.
+Chaque clé est limitée en nombre de requêtes par minute. Au-delà, la réponse est `429` avec l'en-tête `Retry-After`.
+
+> La valeur exacte de la limite est définie dans la base de données (fonction `check_api_rate_limit`). Elle doit être confirmée avant d'être communiquée aux développeurs.
+
+---
+
+## 11. Ce qui n'est pas documenté ici
+
+Les routes de paiement par lien, les abonnements, les retraits et l'administration ne sont pas exposés publiquement et ne font pas partie de cette documentation.
+
+---
+
+## 12. Support
+
+En cas de problème, indique le `transaction_id`, le code d'erreur et l'heure de la requête. N'envoie jamais ta clé complète : les 15 premiers caractères suffisent pour l'identifier.
