@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { ArrowDownToLine, Plus, Smartphone, Trash2, Wallet } from "lucide-react";
 
+type WithdrawalRequest = { id: string; currency_code: string; requested_amount: number; payout_amount: number; fee_amount: number; destination_name: string | null; destination_mobile: string | null; destination_operator: string | null; created_at: string; status_key: "review" | "processing" | "paid" | "refused"; status_label: string; reason: string | null };
 type Movement = { id: string; currency_code: string; kind: string; amount: number; created_at: string };
 type WalletItem = { currency_code: string; balance: number };
 type Minimum = { currency_code: string; minimum_amount: number };
@@ -46,6 +47,8 @@ export default function WithdrawalsView({ appId }: { appId: string; onNew?: () =
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const [requests, setRequests] = useState<WithdrawalRequest[]>([]);
+  const [openId, setOpenId] = useState("");
 
   async function load() {
     const [walletResponse, methodResponse] = await Promise.all([
@@ -65,6 +68,9 @@ export default function WithdrawalsView({ appId }: { appId: string; onNew?: () =
     if (first) setMethodId((old) => old || first.id);
     setError("");
   }
+  useEffect(() => {
+    fetch("/api/withdrawals/history", { cache: "no-store" }).then((r) => r.json()).then((j) => setRequests(j.requests ?? [])).catch(() => {});
+  }, [refresh]);
   useEffect(() => { load().catch((e) => setError(e instanceof Error ? e.message : "Erreur de chargement.")); }, [appId, refresh]);
 
   const selectedMethod = methods.find((m) => m.id === methodId);
@@ -100,6 +106,8 @@ export default function WithdrawalsView({ appId }: { appId: string; onNew?: () =
       const r = await fetch("/api/withdrawals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "schedule", currency_code: currency, amount: amountNumber, destination: { country_code: selectedMethod.country_code, operator: selectedMethod.operator, mobile: selectedMethod.mobile, name: selectedMethod.beneficiary_name } }) });
       const j = await r.json(); if (!r.ok || j.ok === false) throw new Error(j.message ?? "Demande refusée.");
       setNotice({ ok: true, text: j.message ?? "Demande de retrait enregistrée." }); setAmount(""); setRefresh((n) => n + 1);
+      setTab("list");
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) { setNotice({ ok: false, text: e instanceof Error ? e.message : "Demande refusée." }); }
     finally { setBusy(false); }
   }
@@ -121,6 +129,27 @@ export default function WithdrawalsView({ appId }: { appId: string; onNew?: () =
         {amount && (!Number.isFinite(amountNumber) || amountNumber <= 0 || amountNumber > balance || (minimum > 0 && amountNumber < minimum)) && <p className="wd-notice err">{amountNumber > balance ? "Le montant dépasse ton solde disponible." : minimum > 0 && amountNumber < minimum ? `Le retrait minimum est de ${fmt(minimum)} ${currency}.` : "Saisis un montant valide."}</p>}
         <div className="wd-actions"><button className="wd-btn" disabled={busy || !selectedMethod || !currency || !amount || amountNumber <= 0 || amountNumber > balance || (minimum > 0 && amountNumber < minimum)}><ArrowDownToLine size={17} style={{verticalAlign:"middle",marginRight:8}}/>{busy ? "Traitement…" : "Confirmer le retrait"}</button></div>
       </form>
+      <div className="wd-panel">
+        <h2>Mes demandes de retrait</h2>
+        {requests.length === 0 && <p className="wd-muted">Aucune demande pour le moment.</p>}
+        <div style={{ display: "grid", gap: 10 }}>
+          {requests.map((r) => (
+            <div key={r.id} style={{ border: "1px solid #ebe7f6", borderRadius: 16, padding: 14, background: "#fff" }}>
+              <button type="button" onClick={() => setOpenId(openId === r.id ? "" : r.id)} style={{ width: "100%", border: 0, background: "transparent", padding: 0, textAlign: "left", cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", font: "inherit" }}>
+                <span><strong>{r.payout_amount} {r.currency_code}</strong><br /><small style={{ color: "#8a8aa3" }}>{new Date(r.created_at).toLocaleString("fr-FR")}</small></span>
+                <span style={{ padding: "6px 10px", borderRadius: 99, fontSize: 12, fontWeight: 700, background: r.status_key === "paid" ? "#e7f7ef" : r.status_key === "refused" ? "#fff0ee" : r.status_key === "processing" ? "#efeafe" : "#fff7e9", color: r.status_key === "paid" ? "#0f7a47" : r.status_key === "refused" ? "#c8321a" : r.status_key === "processing" ? "#5b3fd6" : "#a16207" }}>{r.status_label}</span>
+              </button>
+              {openId === r.id && (
+                <div style={{ marginTop: 12, display: "grid", gap: 6, fontSize: 14, color: "#4a4a63" }}>
+                  <span>Demandé : {r.requested_amount} {r.currency_code} · Frais : {r.fee_amount} {r.currency_code}</span>
+                  <span>Vers : {r.destination_name ?? "—"} · {r.destination_mobile ?? "—"} · {r.destination_operator ?? "—"}</span>
+                  {r.reason && <span style={{ color: "#c8321a", fontWeight: 600 }}>Motif : {r.reason}</span>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="wd-panel"><div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}><h2>Historique des retraits</h2><input className="wd-search" style={{maxWidth:260}} type="search" placeholder="Rechercher…" value={query} onChange={(e) => setQuery(e.target.value)}/></div>{filtered.length === 0 ? <p className="wd-muted">Aucun retrait pour le moment.</p> : filtered.map((m) => <div className="wd-row" key={m.id}><div><strong>Retrait · {m.currency_code}</strong><small>{dateFmt(m.created_at)}</small></div><strong>{fmt(Math.abs(m.amount))} {m.currency_code}</strong></div>)}</div>
     </>}
   </section>;
