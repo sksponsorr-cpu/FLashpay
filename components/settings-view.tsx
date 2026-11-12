@@ -1,4 +1,6 @@
 "use client";
+import MfaSetup from "@/components/mfa-setup";
+import ChangePassword from "@/components/change-password";
 import { useEffect, useState } from "react";
 import IdentityForm from "@/components/identity-form";
 import { createClient } from "@/lib/supabase/client";
@@ -120,6 +122,12 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
         </div>
       )}
 
+      {tab === "security" && (
+        <>
+          <MfaSetup />
+          <ChangePassword />
+        </>
+      )}
       {tab === "security" && (
         <div className="dash-card set-card">
           <strong>Session</strong>
