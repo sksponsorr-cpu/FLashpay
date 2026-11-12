@@ -1,3 +1,4 @@
+import { minimumFor } from "@/lib/payment-minimums";
 import { createHash, randomBytes } from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -79,9 +80,14 @@ export async function POST(request: Request) {
 
   const countryCode = body.country_code?.trim().toUpperCase();
   const country = getSupportedCountry(countryCode);
+
   const amount = Number(body.amount);
   if (!country) return NextResponse.json({ message: "Pays non configuré dans FlashPay." }, { status: 400 });
   if (!Number.isFinite(amount) || amount <= 0) return NextResponse.json({ message: "Le montant doit être supérieur à zéro." }, { status: 400 });
+  const minimumAmount = minimumFor(country.currency);
+  if (minimumAmount !== null && amount < minimumAmount) {
+    return NextResponse.json({ message: `Le montant minimum est de ${minimumAmount} ${country.currency}.` }, { status: 400 });
+  }
   if (!body.name?.trim() || !body.mobile?.trim()) {
     return NextResponse.json({ message: "Le nom et le numéro mobile du payeur sont requis." }, { status: 400 });
   }
