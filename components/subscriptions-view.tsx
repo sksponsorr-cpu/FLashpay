@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { OPERATOR_ICONS, operatorsFor } from "@/lib/operators";
 import { callingCodeFor, normalizeMobile } from "@/lib/calling-codes";
+import { clientFeeFor } from "@/lib/client-fees";
+import { FLASHPAY_MARGIN_POINTS } from "@/lib/fee-schedule";
 
 // Montants d'abonnement (identiques à la route /api/subscribe)
 const plans = [
@@ -20,6 +22,10 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
   const [choice, setChoice] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [countries, setCountries] = useState<Country[]>([]);
+  const [feeMargin, setFeeMargin] = useState(FLASHPAY_MARGIN_POINTS);
+  useEffect(() => {
+    fetch("/api/platform-settings", { cache: "no-store" }).then((r) => r.json()).then((d) => { if (typeof d.margin_points === "number") setFeeMargin(d.margin_points); }).catch(() => {});
+  }, []);
   const [country, setCountry] = useState("");
   const [operator, setOperator] = useState("");
   const [name, setName] = useState("");
@@ -37,7 +43,7 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
       .select("code,name,currency_code")
       .order("name")
       .then(({ data }) => {
-        if (data) setCountries(data as Country[]);
+        if (data) setCountries((data as Country[]).filter((c) => operatorsFor(c.code).length > 0));
       });
   }, []);
 
@@ -77,6 +83,14 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
     const xof = p.id === "premium" ? 25000 : 10000;
     return `${Math.round(xof * 3.2323).toLocaleString("fr-FR")} CDF / mois`;
   };
+  const feeLabel = (() => {
+    const cur = countries.find((c) => c.code === country)?.currency_code ?? "";
+    const base = chosen ? Number(priceOf(chosen).replace(/[^0-9]/g, "")) : 0;
+    const f = clientFeeFor(country, operator, cur, feeMargin);
+    const raw = base * (f.percent / 100);
+    const amt = Math.round((f.minimum !== null ? Math.max(raw, f.minimum) : raw) * 100) / 100;
+    return `+${amt} ${cur} (${f.percent.toString().replace(".", ",")} %)`;
+  })();
 
   function open(id: string) {
     setChoice(id);
@@ -119,6 +133,14 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Paiement impossible.");
 
+      // Moyen en redirection (Swychr) : le client est envoyé sur la page de paiement.
+      if (result.data.payment_link) {
+        setMessage("Redirection vers la page de paiement sécurisée…");
+        window.location.assign(result.data.payment_link);
+        return;
+      }
+
+      // Paiement direct : validation sur le téléphone avec le code PIN.
       setTxId(result.data.transaction_id);
       setDone(true);
       setMsgOk(true);
@@ -269,6 +291,7 @@ export default function SubscriptionsView({ plan }: { plan: string | null }) {
                   <div><span>Opérateur</span><strong>{operator}</strong></div>
                   <div><span>Numéro</span><strong>{mobile}</strong></div>
                   <div><span>Montant</span><strong className="ck-total">{priceOf(chosen)}</strong></div>
+                  <div><span>Frais</span><strong>{feeLabel}</strong></div>
                 </div>
               </div>
             )}
