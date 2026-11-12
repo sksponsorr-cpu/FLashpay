@@ -2,7 +2,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { clientFeeFor, ISO_BY_COUNTRY_NAME, networksFor } from "@/lib/client-fees";
 import { FLASHPAY_MARGIN_POINTS } from "@/lib/fee-schedule";
-import BrandLoader from "@/components/brand-loader";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -302,7 +301,7 @@ function PayContent() {
         </div>
 
         {notFound && <p className="pg-sub" style={{ marginTop: 18 }}>Ce lien de paiement n’existe pas.</p>}
-        {!notFound && !link && <div style={{ marginTop: 18 }}><BrandLoader /></div>}
+        {!notFound && !link && <p className="pg-sub" style={{ marginTop: 18 }}>Chargement…</p>}
 
         {link && (
           <>
