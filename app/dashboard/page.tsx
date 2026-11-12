@@ -32,6 +32,7 @@ const sections = [
   { id: "webhook-journal", label: "Journal des webhooks", icon: Code2 },
   { id: "disputes", label: "Litiges", icon: Percent },
   { id: "checkout", label: "Checkout", icon: Settings },
+  { id: "team", label: "Équipe", icon: Settings },
   { id: "withdrawals", label: "Retraits", icon: Wallet },
   { id: "developers", label: "Développeurs", icon: Code2 },
   { id: "pricing", label: "Tarification", icon: Percent }, { id: "subs", label: "Abonnements", icon: Percent },
@@ -122,6 +123,7 @@ function DashboardContent() {
         {appId&&active==="transactions"&&<section className="dash-card"><h2>Toutes les transactions</h2><TransactionsList appId={appId}/></section>}
         {appId&&active==="stats"&&<section className="dash-card"><h2>Statistiques</h2><ConversionStats appId={appId}/><StatsView appId={appId}/></section>}
         {appId&&active==="webhook-journal"&&<section className="dash-card"><h2>Journal des webhooks</h2><WebhookJournalView/></section>}
+        {active==="team"&&<section className="dash-card"><h2>Équipe</h2><p>Invite des membres sur une application précise. Ils n’ont accès qu’à celle-là.</p><a href="/team" className="dash-link-btn">Gérer l’équipe</a></section>}
         {active==="checkout"&&<section className="dash-card"><h2>Checkout</h2><p>Logo et couleur de la page de paiement de tes clients.</p><a href="/branding" className="dash-link-btn">Personnaliser le checkout</a></section>}
         {appId&&active==="disputes"&&<section className="dash-card"><h2>Litiges</h2><DisputesView appId={appId}/></section>}
         {appId&&active==="withdrawals"&&<WithdrawalsView appId={appId} onNew={()=>{setAutoWithdraw(true);setActive("wallet")}}/>}
