@@ -34,8 +34,12 @@ export async function POST(request: Request) {
     const timestamp =
       request.headers.get("x-webhook-timestamp") ?? "";
 
-    const signature =
-      request.headers.get("x-webhook-signature-v2") ?? "";
+    // En-tête selon la spécification : X-Webhook-Signature (v2 accepté pour compatibilité).
+    const signature = (
+      request.headers.get("x-webhook-signature") ??
+      request.headers.get("x-webhook-signature-v2") ??
+      ""
+    ).toLowerCase();
 
     const timestampSeconds = Number(timestamp);
 
@@ -219,7 +223,14 @@ export async function POST(request: Request) {
             .select("plan")
             .eq("transaction_id", attributes.transaction_id)
             .maybeSingle();
-          if (subTx?.owner_id) {
+          // Anti-doublon : un même message reçu deux fois ne crée qu'une notification.
+          const { data: alreadyNotified } = await admin
+            .from("user_notifications")
+            .select("id")
+            .eq("reference", attributes.transaction_id)
+            .eq("kind", "subscription")
+            .maybeSingle();
+          if (subTx?.owner_id && !alreadyNotified) {
             const planLabel = subPay?.plan
               ? subPay.plan.charAt(0).toUpperCase() + subPay.plan.slice(1)
               : "Abonnement";
