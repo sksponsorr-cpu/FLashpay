@@ -3,7 +3,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getSupportedCountry } from "@/lib/countries";
-import { computeTotal, createSwychrPaymentRequest, internationalMobile, localMobile } from "@/lib/swychr";
+import { createSwychrPaymentRequest, internationalMobile, localMobile } from "@/lib/swychr";
+import { clientFeeFor } from "@/lib/client-fees";
 import { createSaspayPayment } from "@/lib/saspay";
 import { routeProvider } from "@/lib/payment-routing";
 
@@ -186,11 +187,21 @@ export async function POST(request: Request) {
   const paymentMethod = body.payment_method!.trim().toUpperCase();
   const description = body.description?.trim() || "Collecte FlashPay";
 
-  // Le payeur règle les frais (2,5 %) sauf si le marchand envoie pass_digital_charge: false.
+  // Le payeur règle les frais sauf si le marchand envoie pass_digital_charge: false.
   // Le montant débité est enregistré tel quel, pour que le webhook du prestataire corresponde.
   // Le montant du marchand, la commission et le net restent calculés sur le montant demandé.
+  // Frais du client = taux affiché dans la tarification (taux du réseau + marge), minimum appliqué.
+  // Même règle que la page de paiement hébergée.
   const payerPaysFees = body.pass_digital_charge !== false;
-  const charged = computeTotal(amount, country.code, payerPaysFees);
+  let marginPoints = 5;
+  if (admin) {
+    const { data: marginRow } = await admin.from("platform_settings").select("value").eq("key", "client_fee_margin_points").maybeSingle();
+    if (marginRow) marginPoints = Number(marginRow.value);
+  }
+  const clientFee = clientFeeFor(country.code, paymentMethod, country.currency, marginPoints);
+  const rawFee = amount * (clientFee.percent / 100);
+  const feeAmount = clientFee.minimum !== null ? Math.max(rawFee, clientFee.minimum) : rawFee;
+  const charged = payerPaysFees ? Math.round((amount + feeAmount) * 100) / 100 : amount;
   if (admin && charged !== amount) {
     await admin.from("transactions").update({ amount: charged }).eq("transaction_id", record.out_transaction_id);
   }
