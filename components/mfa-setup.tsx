@@ -58,10 +58,10 @@ export default function MfaSetup() {
           <div dangerouslySetInnerHTML={{ __html: enrolling.qr }} style={{ width: 180, height: 180 }} />
           <p style={{ margin: 0, fontSize: 13, color: "#7a7590", textAlign: "center" }}>Scanne ce QR code, ou saisis la clé : <strong>{enrolling.secret}</strong></p>
           <input inputMode="numeric" maxLength={6} placeholder="Code à 6 chiffres" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} style={{ minHeight: 46, width: "100%", border: "1px solid #e4e1ef", borderRadius: 15, padding: "0 14px", font: "inherit", textAlign: "center", letterSpacing: ".3em" }} />
-          <button type="submit" disabled={busy || code.length !== 6} style={{ minHeight: 48, width: "100%", border: 0, borderRadius: 15, background: "#5b3fd6", color: "#fff", fontWeight: 700, font: "inherit", cursor: "pointer" }}>Confirmer</button>
+          <button type="submit" disabled={busy || code.length !== 6} style={{ minHeight: 48, width: "100%", border: 0, borderRadius: 15, background: "#e8472a", color: "#fff", fontWeight: 700, font: "inherit", cursor: "pointer" }}>Confirmer</button>
         </form>
       ) : (
-        <button onClick={() => void start()} disabled={busy} style={{ minHeight: 48, border: 0, borderRadius: 15, background: "#5b3fd6", color: "#fff", fontWeight: 700, font: "inherit", cursor: "pointer" }}>Activer</button>
+        <button onClick={() => void start()} disabled={busy} style={{ minHeight: 48, border: 0, borderRadius: 15, background: "#e8472a", color: "#fff", fontWeight: 700, font: "inherit", cursor: "pointer" }}>Activer</button>
       )}
 
       {notice && <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: notice.ok ? "#0f7a47" : "#c8321a" }}>{notice.text}</p>}
