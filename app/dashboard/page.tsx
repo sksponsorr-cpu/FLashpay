@@ -1,5 +1,6 @@
 "use client";
 
+import BrandLoader from "@/components/brand-loader";
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownLeft, Code2, LayoutDashboard, Link2, Menu, Percent, Settings, TrendingUp, Wallet } from "lucide-react";
@@ -103,6 +104,9 @@ function DashboardContent() {
   const currentApp = apps.find((item) => item.id === appId) ?? apps[0];
   const currentSection = sections.find((item) => item.id === active)!;
   function selectApp(nextId: string) { router.replace(`${pathname}?app=${encodeURIComponent(nextId)}`); }
+
+  // Logo F tant que les applications ne sont pas chargées (évite un écran vide).
+  if (apps.length === 0 && !appsError) return <BrandLoader fullscreen />;
 
   return <main className="dashboard"><style>{styles}</style><div className="dash-layout">
     <aside className={`dash-side ${menuOpen ? "open" : ""}`}><div className="dash-brand"><span className="dash-logo">f</span>flash<span style={{color:"#e8401f"}}>pay</span></div>{appId&&<AppSwitcher currentId={appId} onChange={(id)=>router.push(`${pathname}?app=${encodeURIComponent(id)}`)}/>}{isAdmin&&<a className="dash-nav" href="/admin" style={{marginBottom:10}}>Bureau d’administration</a>}{sections.map(({id,label,icon:Icon})=><button key={id} className={`dash-nav ${active===id?"active":""}`} onClick={()=>{setActive(id);setMenuOpen(false)}}><Icon size={18}/>{label}</button>)}<a className="dash-nav" href="/apps">← Mes applications</a>
