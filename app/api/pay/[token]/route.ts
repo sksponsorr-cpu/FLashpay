@@ -12,6 +12,7 @@ import { routeProvider } from "@/lib/payment-routing";
 import { clientFeeFor } from "@/lib/client-fees";
 import { liveGate } from "@/lib/live-gate";
 import { minimumFor } from "@/lib/payment-minimums";
+import { customerMessage } from "@/lib/payment-messages";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -144,7 +145,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
 
     if (!result.ok) {
       await markFailed();
-      return NextResponse.json({ message: result.message }, { status: 502 });
+      return NextResponse.json({ message: customerMessage(result.message) }, { status: 502 });
     }
 
     if (result.providerId || result.reference) {
@@ -179,7 +180,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
 
   if (!result.ok) {
     await markFailed();
-    return NextResponse.json({ message: result.message }, { status: 502 });
+    return NextResponse.json({ message: customerMessage(result.message) }, { status: 502 });
   }
 
   return NextResponse.json({
