@@ -3,7 +3,7 @@
 import BrandLoader from "@/components/brand-loader";
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowDownLeft, Code2, LayoutDashboard, Link2, Menu, Percent, Settings, TrendingUp, Wallet } from "lucide-react";
+import { Users, ArrowDownLeft, Code2, LayoutDashboard, Link2, Menu, Percent, Settings, TrendingUp, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ApiKeyManager from "@/components/api-key-manager";
 import TransactionsList from "@/components/transactions-list";
@@ -12,6 +12,7 @@ import PricingView from "@/components/pricing-view";
 import WebhookJournalView from "@/components/webhook-journal-view";
 import DisputesView from "@/components/disputes-view";
 import ConversionStats from "@/components/conversion-stats";
+import ClientsView from "@/components/clients-view";
 import WalletOverview from "@/components/wallet-overview";
 import TestFunds from "@/components/test-funds";
 import WithdrawalsView from "@/components/withdrawals-view";
@@ -32,7 +33,7 @@ const sections = [
   { id: "webhook-journal", label: "Journal des webhooks", icon: Code2 },
   { id: "disputes", label: "Litiges", icon: Percent },
   { id: "checkout", label: "Checkout", icon: Settings },
-  { id: "team", label: "Équipe", icon: Settings },
+  { id: "clients", label: "Clients", icon: Users },
   { id: "withdrawals", label: "Retraits", icon: Wallet },
   { id: "developers", label: "Développeurs", icon: Code2 },
   { id: "pricing", label: "Tarification", icon: Percent }, { id: "subs", label: "Abonnements", icon: Percent },
@@ -123,8 +124,8 @@ function DashboardContent() {
         {appId&&active==="transactions"&&<section className="dash-card"><h2>Toutes les transactions</h2><TransactionsList appId={appId}/></section>}
         {appId&&active==="stats"&&<section className="dash-card"><h2>Statistiques</h2><ConversionStats appId={appId}/><StatsView appId={appId}/></section>}
         {appId&&active==="webhook-journal"&&<section className="dash-card"><h2>Journal des webhooks</h2><WebhookJournalView/></section>}
-        {active==="team"&&<section className="dash-card"><h2>Équipe</h2><p>Invite des membres sur une application précise. Ils n’ont accès qu’à celle-là.</p><a href="/team" className="dash-link-btn">Gérer l’équipe</a></section>}
-        {active==="checkout"&&<section className="dash-card"><h2>Checkout</h2><p>Logo et couleur de la page de paiement de tes clients.</p><a href="/branding" className="dash-link-btn">Personnaliser le checkout</a></section>}
+                {appId&&active==="clients"&&<section className="dash-card"><h2>Clients</h2><ClientsView appId={appId}/></section>}
+        {active==="checkout"&&<section className="dash-card" style={{display:"grid",gap:14,maxWidth:560}}><div><h2 style={{margin:0,fontSize:18,fontWeight:800,color:"#14142b"}}>Checkout</h2><p style={{margin:"6px 0 0",color:"#7a7590",fontSize:14,lineHeight:1.5}}>Logo et couleur de la page de paiement de tes clients.</p></div><a href="/branding" style={{display:"inline-flex",justifyContent:"center",alignItems:"center",minHeight:46,padding:"0 22px",borderRadius:14,background:"#e8472a",color:"#fff",fontWeight:700,fontSize:15,textDecoration:"none",boxShadow:"0 12px 24px -14px rgba(232,71,42,.8)",width:"fit-content"}}>Personnaliser le checkout</a></section>}
         {appId&&active==="disputes"&&<section className="dash-card"><h2>Litiges</h2><DisputesView appId={appId}/></section>}
         {appId&&active==="withdrawals"&&<WithdrawalsView appId={appId} onNew={()=>{setAutoWithdraw(true);setActive("wallet")}}/>}
         {appId&&active==="developers"&&<section className="dev-wrap">
