@@ -193,7 +193,9 @@ export type PaymentRequestResult =
   | { ok: false; message: string };
 
 function pickLink(data: Record<string, unknown>): string | null {
-  const candidates = [data["payment_link"], data["payment_url"], data["checkout_url"], data["url"], data["payment_uuid"]];
+  // Seuls les champs de PAIEMENT sont acceptés. Un champ générique (url, payment_uuid) peut pointer
+  // vers l'espace administrateur du prestataire : on ne le suit jamais.
+  const candidates = [data["payment_link"], data["payment_url"], data["checkout_url"]];
   for (const value of candidates) {
     if (typeof value === "string" && /^https?:\/\//.test(value)) return value;
   }
