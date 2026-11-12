@@ -1,12 +1,12 @@
 // FLASH PAY — routage automatique par pays.
 // Paiement direct (SasPay) : le client reste dans l'application.
 // Redirection (Swychr) : le client est envoyé sur la page de paiement, puis revient.
-// Paiement direct (SasPay) : RDC, Burkina Faso, Bénin, Mali, Sénégal uniquement.
-export const SASPAY_COUNTRIES = new Set(["CD", "BF", "BJ", "ML", "SN"]);
+// Paiement direct (SasPay) : RDC, Congo-Brazzaville, Burkina Faso, Bénin, Mali, Sénégal.
+export const SASPAY_COUNTRIES = new Set(["CD", "CG", "BF", "BJ", "ML", "SN"]);
 
 // Tous les autres pays : lien de redirection Swychr (ex. Cameroun).
 export const SWYCHR_COUNTRIES = new Set([
-  "CG", "CM", "CI", "GH", "KE", "NG", "RW", "SL", "TG", "TZ", "UG", "ZM",
+  "CM", "CI", "GH", "KE", "NG", "RW", "SL", "TG", "TZ", "UG", "ZM",
 ]);
 
 export type Provider = "saspay" | "swychr";
