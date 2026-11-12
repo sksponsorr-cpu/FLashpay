@@ -12,7 +12,7 @@ export default function ForgotPasswordPage() {
   async function send(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    await createClient().auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/settings` });
+    await createClient().auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/dashboard` });
     setBusy(false);
     setSent(true); // Message identique, que le compte existe ou non (pas de fuite d'information).
   }
