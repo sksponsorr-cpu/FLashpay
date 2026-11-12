@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { clientFeeFor, ISO_BY_COUNTRY_NAME, networksFor } from "@/lib/client-fees";
 import { FLASHPAY_MARGIN_POINTS } from "@/lib/fee-schedule";
+import BrandLoader from "@/components/brand-loader";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -267,7 +268,8 @@ function PayContent() {
                 <circle className="pg-burst" cx="30" cy="30" r="30" fill="none" stroke="#2fbf7f" strokeOpacity=".25" strokeWidth="2" />
               </svg>
               <h2 className="pg-h">Paiement effectué avec succès !</h2>
-              <p className="pg-sub">Ton paiement de {fmt(total)} {link?.currency_code} est confirmé. Un reçu t’a été envoyé.</p>
+              <p className="pg-sub">Ton paiement de {fmt(total)} {link?.currency_code} est confirmé.</p>
+              {txId && <a href={`/pay/${encodeURIComponent(token)}/recu?tx=${encodeURIComponent(txId)}`} style={{ color: "#b9a8ff", fontWeight: 700 }}>Voir le reçu</a>}
             </div>
           ) : waitStatus === "failed" ? (
             <>
@@ -300,7 +302,7 @@ function PayContent() {
         </div>
 
         {notFound && <p className="pg-sub" style={{ marginTop: 18 }}>Ce lien de paiement n’existe pas.</p>}
-        {!notFound && !link && <p className="pg-sub" style={{ marginTop: 18 }}>Chargement…</p>}
+        {!notFound && !link && <div style={{ marginTop: 18 }}><BrandLoader /></div>}
 
         {link && (
           <>
