@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAppAccess, serviceReader } from "@/lib/app-access";
 
 const liveKeysEnabled = () => process.env.LIVE_API_KEYS_ENABLED === "true";
 
@@ -11,10 +12,12 @@ export async function GET(request: Request) {
     if (authError || !user) return NextResponse.json({ message: "Connecte-toi pour gérer tes clés." }, { status: 401 });
     const appId = new URL(request.url).searchParams.get("app");
     if (!appId) return NextResponse.json({ message: "Choisis une application." }, { status: 400 });
-    const { data: app } = await supabase.from("apps").select("id").eq("id", appId).eq("owner_id", user.id).maybeSingle();
-    if (!app) return NextResponse.json({ message: "Application introuvable." }, { status: 404 });
+    const access = await getAppAccess(supabase, appId);
+    if (access.role === "none") return NextResponse.json({ message: "Application introuvable." }, { status: 404 });
+    const reader = access.role === "owner" ? supabase : serviceReader();
+    if (!reader) return NextResponse.json({ message: "Configuration incomplète." }, { status: 503 });
     const [{ data, error }, { data: profile }] = await Promise.all([
-      supabase.from("api_keys").select("id, name, key_prefix, environment, created_at, last_used_at, revoked_at").eq("app_id", appId).order("created_at", { ascending: false }),
+      reader.from("api_keys").select("id, name, key_prefix, environment, created_at, last_used_at, revoked_at").eq("app_id", appId).order("created_at", { ascending: false }),
       supabase.from("profiles").select("verification_status").eq("id", user.id).maybeSingle(),
     ]);
     if (error) return NextResponse.json({ message: "Impossible de charger les clés de cette application." }, { status: 503 });
@@ -34,8 +37,8 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ message: "Connecte-toi pour créer une clé." }, { status: 401 });
-    const { data: app } = await supabase.from("apps").select("id").eq("id", body.app_id).eq("owner_id", user.id).maybeSingle();
-    if (!app) return NextResponse.json({ message: "Application introuvable." }, { status: 404 });
+    const access = await getAppAccess(supabase, body.app_id);
+    if (access.role !== "owner") return NextResponse.json({ message: "Seul le propriétaire peut créer une clé." }, { status: 403 });
     const secret = `${environment === "live" ? "fp_live_" : "fp_test_"}${randomBytes(32).toString("base64url")}`;
     const hash = createHash("sha256").update(secret).digest("hex");
     const { data, error } = await supabase.rpc("create_api_key_for_app", { p_app_id: body.app_id, p_name: name, p_key_prefix: secret.slice(0, 15), p_key_hash: hash, p_environment: environment });
