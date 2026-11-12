@@ -136,6 +136,8 @@ export async function GET() {
 }
 
 type AdminAction =
+  | { action: "set_account_status"; owner_id: string; status: "active" | "suspended" | "banned"; days?: number }
+  | { action: "credit_wallet"; owner_id: string; currency: string; amount: number; reason: string }
   | { action: "set_margin"; points: number }
   | { action: "close_ticket"; id: string }
   | { action: "mark_withdrawal_paid"; id: string }
@@ -160,6 +162,28 @@ export async function POST(request: Request) {
 
   let result;
   switch (body.action) {
+    case "set_account_status": {
+      const until = body.status === "banned" ? new Date(Date.now() + (Number(body.days) || 30) * 86400000).toISOString() : null;
+      result = await serviceClient().from("profiles").update({
+        account_status: body.status,
+        banned_until: until,
+      }).eq("id", body.owner_id);
+      break;
+    }
+    case "credit_wallet": {
+      const amount = Number(body.amount);
+      if (!(amount > 0) || !body.reason?.trim()) return NextResponse.json({ message: "Montant et motif obligatoires." }, { status: 400 });
+      const svc = serviceClient();
+      const { data: wallet } = await svc.from("wallets").select("id, balance").eq("owner_id", body.owner_id).eq("currency_code", body.currency).maybeSingle();
+      if (!wallet) return NextResponse.json({ message: "Aucun portefeuille dans cette devise pour ce compte." }, { status: 404 });
+      const newBalance = Number(wallet.balance) + amount;
+      await svc.from("wallets").update({ balance: newBalance, updated_at: new Date().toISOString() }).eq("id", wallet.id);
+      result = await svc.from("wallet_movements").insert({
+        owner_id: body.owner_id, wallet_id: wallet.id, currency_code: body.currency, kind: "adjustment",
+        amount, balance_after: newBalance, reference: `admin_credit:${crypto.randomUUID()}`,
+      });
+      break;
+    }
     case "set_margin": {
       const points = Number(body.points);
       if (!Number.isFinite(points) || points < 0 || points > 50) return NextResponse.json({ message: "Marge invalide (0 à 50 points)." }, { status: 400 });
