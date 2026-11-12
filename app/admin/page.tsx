@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import PaymentProviderSwitch from "@/components/admin/payment-provider-switch";
+import BrandLoader from "@/components/brand-loader";
 
 type Withdrawal = { id: string; currency_code: string; requested_amount: number; payout_amount: number; fee_amount: number; destination_details?: unknown; destination_name?: string | null; destination_country?: string | null; destination_operator?: string | null; destination_mobile?: string | null; created_at: string };
 type Conversion = { id: string; from_currency: string; to_currency: string; amount: number; fee_rate?: number; created_at: string };
@@ -92,10 +93,20 @@ const CSS = `
 @media(prefers-reduced-motion:reduce){.adm *{animation:none!important;transition:none!important}}
 @media(max-width:860px){
   .adm{grid-template-columns:1fr}
-  .adm-side{position:static;height:auto;flex-direction:column;gap:14px;padding:16px}
-  .adm-main{padding:16px 14px 40px}
+  .adm-side{position:static;height:auto;flex-direction:row;overflow-x:auto;gap:8px;padding:10px 12px;border-right:0;border-bottom:1px solid #ebe7f6;white-space:nowrap;align-items:center}
+  .adm-side > div{display:flex;gap:6px;flex:none}
+  .adm-cap{display:none}
+  .adm-nav{width:auto;min-height:38px;flex:none;border-radius:99px;background:#f4f1ff;color:#3b2a8c;padding:0 14px}
+  .adm-nav.on{background:#5b3fd6;color:#fff}
+  .adm-back{display:none}
+  .adm-brand{display:none}
+  .adm-main{padding:14px 14px 40px}
+  .adm-top{flex-wrap:wrap}
   .adm-me{display:none}
-  .adm h1{font-size:24px}
+  .adm h1{font-size:22px}
+  .adm-kpis{grid-template-columns:1fr 1fr;gap:10px}
+  .adm-kpi strong{font-size:22px}
+  .adm-table th,.adm-table td{padding:10px 6px;font-size:13px}
 }
 `;
 
@@ -188,6 +199,8 @@ export default function AdminPage() {
 
   const feesPending = (data?.withdrawals ?? []).reduce<number>((sum, w) => sum + Number(w.fee_amount ?? 0), 0);
   const pendingTotal = (data?.withdrawals.length ?? 0) + (data?.identities?.length ?? 0) + (data?.conversions.length ?? 0);
+
+  if (!data && !error) return <BrandLoader fullscreen />;
 
   return (
     <main className="adm">
