@@ -223,6 +223,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: result.error.message || "Action refusée." }, { status: 400 });
   }
 
+  // Les fonctions de retrait répondent par un code : on le traduit, on ne le masque pas.
+  const code = typeof result.data === "string" ? result.data : null;
+  const blocked: Record<string, string> = {
+    ALREADY_PROCESSED: "Cette demande a déjà été traitée.",
+    UNKNOWN_REQUEST: "Demande introuvable.",
+  };
+  if (code && blocked[code]) {
+    return NextResponse.json({ message: blocked[code] }, { status: 409 });
+  }
+
+  // Notification du marchand : visible seulement quand l'administrateur a tranché.
+  if (body.action === "mark_withdrawal_paid" || body.action === "reject_withdrawal") {
+    try {
+      const { data: wd } = await serviceClient()
+        .from("withdrawal_requests")
+        .select("id, owner_id, payout_amount, currency_code")
+        .eq("id", body.id)
+        .maybeSingle();
+      if (wd?.owner_id) {
+        const paid = body.action === "mark_withdrawal_paid";
+        await serviceClient().from("user_notifications").insert({
+          owner_id: wd.owner_id,
+          kind: "withdrawal",
+          title: paid ? "Retrait réussi" : "Retrait refusé",
+          body: paid
+            ? `${wd.payout_amount} ${wd.currency_code} envoyés vers ton mobile money.`
+            : `Ton retrait de ${wd.payout_amount} ${wd.currency_code} n’a pas été accepté. Le montant est rendu à ton portefeuille.`,
+          reference: wd.id,
+        });
+      }
+    } catch {
+      // La notification ne bloque jamais l'action de l'administrateur.
+    }
+  }
+
   // Journal : qui a fait quoi, et quand (jamais bloquant).
   try {
     const { data: who } = await supabase.auth.getUser();
