@@ -129,7 +129,7 @@ export default function PricingView() {
                         <span style={{ fontSize: 14, color: "#14142b", fontWeight: 600 }}>{n.network}</span>
                         <strong style={{ fontSize: 15, color: "#5b3fd6", textAlign: "right" }}>
                           {clientRate(n.percent, margin)}
-                          <span style={{ display: "block", fontSize: 12, color: "#8a8aa3", fontWeight: 500 }}>SasPay {n.percent.toString().replace(".", ",")} %</span>
+                          <span style={{ display: "block", fontSize: 12, color: "#8a8aa3", fontWeight: 500 }}>Frais opérateur {n.percent.toString().replace(".", ",")} %</span>
                           {n.extra ? <span style={{ color: "#6b6c80", fontWeight: 500 }}> {n.extra}</span> : null}
                         </strong>
                         {n.minimum ? <span style={{ fontSize: 12, color: "#8a8aa3" }}>Frais minimum : {n.minimum}</span> : <span />}
