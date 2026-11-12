@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAppAccess, serviceReader } from "@/lib/app-access";
 
 // Portefeuille du compte connecté (mode par compte) ou d'une application (?app=<id>).
 // Les frais de retrait et de conversion sont calculés par les fonctions SQL, selon l'abonnement actif.
@@ -19,15 +20,22 @@ export async function GET(request: Request) {
   const appId = new URL(request.url).searchParams.get("app");
 
   // Vérifie l'application si elle est demandée
+  // Accès : propriétaire ou membre invité (lecture). Les membres lisent via la clé de service, filtrée par l'application.
+  let reader = supabase;
   if (appId) {
-    const { data: app } = await supabase.from("apps").select("id").eq("id", appId).eq("owner_id", user.id).maybeSingle();
-    if (!app) return NextResponse.json({ message: "Application introuvable." }, { status: 404 });
+    const access = await getAppAccess(supabase, appId);
+    if (access.role === "none") return NextResponse.json({ message: "Application introuvable." }, { status: 404 });
+    if (access.role !== "owner") {
+      const svc = serviceReader();
+      if (!svc) return NextResponse.json({ message: "Configuration incomplète." }, { status: 503 });
+      reader = svc;
+    }
   }
 
   // Requête filtrée par application (si demandée) ou par compte.
   const scopeBy = (table: string, columns: string) =>
     appId
-      ? supabase.from(table).select(columns).eq("app_id", appId)
+      ? reader.from(table).select(columns).eq("app_id", appId)
       : supabase.from(table).select(columns).eq("owner_id", user.id);
 
   const [wallets, movements, withdrawals, conversions, minimums, rates, plan] = await Promise.all([
