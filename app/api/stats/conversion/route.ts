@@ -1,72 +1,26 @@
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
+import { getAppAccess } from "@/lib/app-access";
 
-// Enregistre une visite de la page de paiement.
-export async function POST(request: Request) {
-try {
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Statistiques de conversion des 30 derniers jours : visites des liens, paiements réussis, taux.
+export async function GET(request: Request) {
+  const supabase = await createClient();
+  const appId = new URL(request.url).searchParams.get("app") ?? "";
+  if (!appId) return NextResponse.json({ message: "Choisis une application." }, { status: 400 });
+  const access = await getAppAccess(supabase, appId);
+  if (access.role === "none") return NextResponse.json({ message: "Application introuvable." }, { status: 404 });
 
-if (!url || !key) {
-  return NextResponse.json(
-    { ok: false, message: "Configuration serveur manquante." },
-    { status: 503 }
-  );
-}
-
-const body = await request.json().catch(() => ({}));
-const requestUrl = new URL(request.url);
-
-const token = body.token || requestUrl.searchParams.get("token");
-
-if (!token || typeof token !== "string") {
-  return NextResponse.json(
-    { ok: false, message: "Token manquant." },
-    { status: 400 }
-  );
-}
-
-const admin = createSupabaseClient(url, key, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false,
-  },
-});
-
-const { data: link, error } = await admin
-  .from("payment_links")
-  .select("app_id")
-  .eq("token", token)
-  .maybeSingle();
-
-if (error || !link?.app_id) {
-  return NextResponse.json(
-    { ok: false },
-    { status: 404 }
-  );
-}
-
-const { error: insertError } = await admin
-  .from("payment_link_views")
-  .insert({
-    app_id: link.app_id,
-    link_token: token,
+  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+  const [views, paid] = await Promise.all([
+    supabase.from("payment_link_views").select("id", { count: "exact", head: true }).eq("app_id", appId).gte("created_at", since),
+    supabase.from("transactions").select("id", { count: "exact", head: true }).eq("app_id", appId).eq("status", "successful").gte("created_at", since),
+  ]);
+  const visits = views.count ?? 0;
+  const payments = paid.count ?? 0;
+  return NextResponse.json({
+    days: 30,
+    visits,
+    payments,
+    conversion_rate: visits > 0 ? Math.round((payments / visits) * 1000) / 10 : null,
   });
-
-if (insertError) {
-  return NextResponse.json(
-    { ok: false },
-    { status: 500 }
-  );
-}
-
-return NextResponse.json({ ok: true });
-
-} catch {
-return NextResponse.json(
-{ ok: false, message: "Erreur interne du serveur." },
-{ status: 500 }
-);
-}
 }
