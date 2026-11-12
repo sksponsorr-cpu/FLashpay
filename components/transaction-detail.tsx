@@ -134,6 +134,11 @@ export default function TransactionDetail({ transactionId, onClose }: { transact
             <Rows items={money} />
             <div className="td-sec">Client</div>
             <Rows items={client} />
+            {tx?.status === "successful" && tx.transaction_id && (
+              <a href={`/facture/${encodeURIComponent(tx.transaction_id)}`} target="_blank" rel="noopener" style={{ display: "block", marginTop: 16, textAlign: "center", minHeight: 46, lineHeight: "46px", borderRadius: 14, background: "#e8472a", color: "#fff", fontWeight: 700, textDecoration: "none" }}>
+                Voir la facture
+              </a>
+            )}
           </>
         )}
       </div>
