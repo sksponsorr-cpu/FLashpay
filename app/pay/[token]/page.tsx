@@ -122,6 +122,7 @@ function PayContent() {
   const [msg, setMsg] = useState("");
   const [txId, setTxId] = useState("");
   const [waitStatus, setWaitStatus] = useState<"" | "pending" | "successful" | "failed">("");
+  const [secondsLeft, setSecondsLeft] = useState(30);
 
   useEffect(() => {
     (async () => {
@@ -133,6 +134,29 @@ function PayContent() {
   }, [token]);
 
   // Attente de la confirmation sur téléphone (fournisseur à paiement direct).
+  // Échec affiché : on informe le serveur pour fermer la transaction côté FlashPay.
+  useEffect(() => {
+    if (waitStatus !== "failed" || !txId) return;
+    fetch(`/api/pay/${encodeURIComponent(token)}/status?tx=${encodeURIComponent(txId)}`, { cache: "no-store" }).catch(() => {});
+  }, [waitStatus, txId, token]);
+
+  // Paiement direct : 30 secondes pour valider sur le téléphone, sinon le paiement n'aboutit pas.
+  useEffect(() => {
+    if (!txId) return;
+    setSecondsLeft(30);
+    const clock = setInterval(() => {
+      setSecondsLeft((v) => {
+        if (v <= 1) {
+          clearInterval(clock);
+          setWaitStatus((w) => (w === "successful" ? w : "failed"));
+          return 0;
+        }
+        return v - 1;
+      });
+    }, 1000);
+    return () => clearInterval(clock);
+  }, [txId]);
+
   useEffect(() => {
     if (!txId || waitStatus === "successful" || waitStatus === "failed") return;
     let tries = 0;
@@ -227,20 +251,35 @@ function PayContent() {
         <div className="pg-card" style={{ textAlign: "center", display: "grid", gap: 14, justifyItems: "center" }}>
           <div className="pg-ring"><span className="pg-phone">📱</span></div>
           {waitStatus === "successful" ? (
-            <>
-              <h2 className="pg-h">Paiement reçu</h2>
-              <p className="pg-sub">Merci. Ton paiement de {fmt(total)} {link?.currency_code} est confirmé.</p>
-            </>
+            <div className="pg-result">
+              <style>{`
+                .pg-result{display:grid;justify-items:center;text-align:center;gap:10px;padding:8px 0}
+                .pg-circle{stroke-dasharray:166;stroke-dashoffset:166;animation:pg-draw .7s ease forwards}
+                .pg-check{stroke-dasharray:48;stroke-dashoffset:48;animation:pg-draw .4s .6s ease forwards}
+                .pg-burst{transform-origin:50% 50%;animation:pg-pop .6s .9s ease both}
+                @keyframes pg-draw{to{stroke-dashoffset:0}}
+                @keyframes pg-pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}
+                @media (prefers-reduced-motion:reduce){.pg-circle,.pg-check,.pg-burst{animation:none;stroke-dashoffset:0}}
+              `}</style>
+              <svg width="96" height="96" viewBox="0 0 60 60" aria-hidden>
+                <circle className="pg-circle" cx="30" cy="30" r="26.5" fill="none" stroke="#2fbf7f" strokeWidth="3" strokeLinecap="round" />
+                <path className="pg-check" d="M18 31 L26 39 L43 22" fill="none" stroke="#2fbf7f" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                <circle className="pg-burst" cx="30" cy="30" r="30" fill="none" stroke="#2fbf7f" strokeOpacity=".25" strokeWidth="2" />
+              </svg>
+              <h2 className="pg-h">Paiement effectué avec succès !</h2>
+              <p className="pg-sub">Ton paiement de {fmt(total)} {link?.currency_code} est confirmé. Un reçu t’a été envoyé.</p>
+            </div>
           ) : waitStatus === "failed" ? (
             <>
-              <h2 className="pg-h">Paiement non abouti</h2>
-              <p className="pg-sub">Le paiement n’a pas été confirmé sur ton téléphone. Tu peux réessayer.</p>
+              <h2 className="pg-h">Le paiement n’a pas abouti</h2>
+              <p className="pg-sub">Le paiement n’a pas été confirmé dans le temps imparti (30 secondes). Tu peux réessayer.</p>
               <button className="pg-btn" onClick={() => { setTxId(""); setWaitStatus(""); setStep(2); }}>Réessayer</button>
             </>
           ) : (
             <>
+              <p className="pg-sub" style={{ margin: 0, letterSpacing: ".04em", textTransform: "uppercase", fontSize: 12, color: "#b9b4d6" }}>Sécurisation de votre transaction…</p>
               <h2 className="pg-h">Confirme le paiement sur ton téléphone</h2>
-              <p className="pg-sub">Saisis ton code PIN quand ton téléphone te le demande. Cette page se met à jour toute seule.</p>
+              <p className="pg-sub">Saisis ton code PIN quand ton téléphone te le demande. Temps restant : {secondsLeft} s.</p>
               <div className="pg-steps">
                 <span className="pg-stepn">1</span><span>Demande envoyée à {chosen?.name ?? "ton opérateur"}</span>
               </div>
