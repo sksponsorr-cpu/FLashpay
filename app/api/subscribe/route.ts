@@ -5,6 +5,7 @@ import { getSupportedCountry } from "@/lib/countries";
 import { createSwychrPaymentRequest, resolvePaymentMethod } from "@/lib/swychr";
 import { createSaspayPayment } from "@/lib/saspay";
 import { routeProvider } from "@/lib/payment-routing";
+import { clientFeeFor } from "@/lib/client-fees";
 import { createClient } from "@/lib/supabase/server";
 
 // Taux appliqué pour les abonnements en RDC (1 XOF = 3,2323 CDF).
@@ -53,7 +54,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const chargeAmount = country.currency === "CDF" ? Math.round(plan.amount * XOF_TO_CDF) : plan.amount;
 
   if (!body.mobile?.trim() || !body.payment_method?.trim()) {
     return NextResponse.json({ message: "Numéro et opérateur obligatoires." }, { status: 400 });
@@ -72,6 +72,14 @@ export async function POST(request: Request) {
   const admin = createSupabaseClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+  const planAmount = country.currency === "CDF" ? Math.round(plan.amount * XOF_TO_CDF) : plan.amount;
+  // Frais client ajoutés au montant du plan : taux du réseau + marge (minimum appliqué si défini).
+  const { data: marginRow } = await admin.from("platform_settings").select("value").eq("key", "client_fee_margin_points").maybeSingle();
+  const margin = marginRow ? Number(marginRow.value) : 5;
+  const fee = clientFeeFor(country.code, body.payment_method, country.currency, margin);
+  const rawFee = planAmount * (fee.percent / 100);
+  const feeAmount = Math.round((fee.minimum !== null ? Math.max(rawFee, fee.minimum) : rawFee) * 100) / 100;
+  const chargeAmount = Math.round((planAmount + feeAmount) * 100) / 100;
 
   const transactionId = `SUB-${randomBytes(8).toString("hex").toUpperCase()}`;
   const paymentMethod =
