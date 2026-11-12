@@ -33,18 +33,19 @@ const CSS = `
 .adm-side{position:sticky;top:0;height:100vh;overflow-y:auto;background:#fff;border-right:1px solid #ebe7f6;padding:24px 16px;display:flex;flex-direction:column;gap:20px}
 .adm-brand{display:flex;align-items:center;gap:10px;padding:0 8px;font-size:18px;font-weight:800;letter-spacing:-.01em;color:#14142b}
 .adm-brand small{font-size:12px;font-weight:700;color:#e8472a;margin-left:2px}
-.adm-logo{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:linear-gradient(145deg,#7c5be6,#5b3fd6);color:#fff;font-weight:800;box-shadow:0 10px 22px -10px rgba(91,63,214,.8)}
+.adm-logo{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:linear-gradient(145deg,#7c5be6,#e8472a);color:#fff;font-weight:800;box-shadow:0 10px 22px -10px rgba(91,63,214,.8)}
 .adm-cap{margin:0 0 8px;padding:0 10px;color:#9a97b0;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .adm-nav{width:100%;display:flex;align-items:center;justify-content:space-between;min-height:42px;padding:0 12px;border:0;border-radius:14px;background:transparent;color:#55566a;font:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s ease,color .2s ease,transform .2s ease}
-.adm-nav:hover{background:#f4f1ff;color:#3b2a8c;transform:translateX(2px)}
-.adm-nav.on{background:#5b3fd6;color:#fff;box-shadow:0 12px 26px -14px rgba(91,63,214,.9)}
+.adm-nav:hover{background:#fff5f2;color:#a3321c;transform:translateX(2px)}
+.adm-nav.on{background:#e8472a;color:#fff;box-shadow:0 12px 26px -14px rgba(91,63,214,.9)}
 .adm-nav em{font-style:normal;min-width:22px;height:20px;padding:0 6px;border-radius:99px;background:#ffe6de;color:#e8472a;font-size:11px;font-weight:800;display:grid;place-items:center}
-.adm-nav.on em{background:#fff;color:#5b3fd6}
-.adm-back{margin-top:auto;padding:0 10px;color:#5b3fd6;font-size:13px;font-weight:700;text-decoration:none}
+.adm-nav.on em{background:#fff;color:#e8472a}
+.adm-back{margin-top:auto;padding:0 10px;color:#e8472a;font-size:13px;font-weight:700;text-decoration:none}
 .adm-main{min-width:0;padding:24px 30px 52px}
 .adm-top{display:flex;align-items:center;gap:12px;margin-bottom:26px}
 .adm-search{flex:1;min-width:0;height:46px;border:1px solid #ebe7f6;border-radius:16px;background:#fff;padding:0 16px;font:inherit;font-size:14px;outline:0;transition:border .2s ease,box-shadow .2s ease}
-.adm-search:focus{border-color:#8f7ae8;box-shadow:0 0 0 4px #efeafe}
+.adm-search:focus{border-color:#8f7ae8;box-shadow:0 0 0 4px #fff0ec}
+.adm-burger{display:none;width:46px;height:46px;flex:none;border:1px solid #ebe7f6;border-radius:16px;background:#fff;place-items:center;cursor:pointer;color:#14142b}
 .adm-bell{position:relative;width:46px;height:46px;flex:none;border:1px solid #ebe7f6;border-radius:16px;background:#fff;display:grid;place-items:center;color:#14142b;cursor:default}
 .adm-bell i{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:#e8472a;color:#fff;font-size:11px;font-weight:800;font-style:normal;display:grid;place-items:center;box-shadow:0 0 0 2px #f6f5fb}
 .adm-me{display:flex;align-items:center;gap:10px;height:46px;padding:0 16px 0 6px;border:1px solid #ebe7f6;border-radius:16px;background:#fff;font-size:14px;font-weight:700;color:#2d2540;white-space:nowrap}
@@ -56,7 +57,7 @@ const CSS = `
 .adm-kpi span{font-size:13px;font-weight:600;color:#6b6680}
 .adm-kpi strong{font-size:30px;font-weight:800;letter-spacing:-.02em}
 .adm-kpi small{color:#8a8aa3;font-size:12px;line-height:1.4}
-.adm-kpi.violet{background:linear-gradient(160deg,#f4f1ff,#ebe5ff);border-color:#e4dcff}
+.adm-kpi.violet{background:linear-gradient(160deg,#fff5f2,#ebe5ff);border-color:#ffd6cc}
 .adm-kpi.mint{background:linear-gradient(160deg,#eefaf5,#e0f5ec);border-color:#c9ecdb}
 .adm-kpi.amber{background:linear-gradient(160deg,#fff8ea,#fdf0d2);border-color:#f3dfae}
 .adm-kpi.rose{background:linear-gradient(160deg,#fff2f0,#ffe3dc);border-color:#f6cfc6}
@@ -81,32 +82,31 @@ const CSS = `
 .adm-btn{min-height:44px;padding:0 18px;border:0;border-radius:15px;background:#e8472a;color:#fff;font:inherit;font-weight:700;cursor:pointer;transition:transform .15s ease,box-shadow .2s ease,opacity .2s ease;box-shadow:0 12px 24px -14px rgba(232,71,42,.8)}
 .adm-btn:hover{transform:translateY(-1px)}
 .adm-btn:active{transform:scale(.97)}
-.adm-btn.g{background:#fff;color:#5b3fd6;border:1px solid #e4dcff;box-shadow:none}
+.adm-btn.g{background:#fff;color:#e8472a;border:1px solid #ffd6cc;box-shadow:none}
 .adm-btn:disabled{opacity:.55;cursor:default;transform:none}
 .adm-in{min-height:46px;width:100%;padding:0 14px;border:1px solid #e4e1ef;border-radius:15px;background:#fbfbfe;font:inherit;font-size:14px;outline:0;transition:border .2s ease,box-shadow .2s ease}
-.adm-in:focus{border-color:#8f7ae8;box-shadow:0 0 0 4px #efeafe}
+.adm-in:focus{border-color:#8f7ae8;box-shadow:0 0 0 4px #fff0ec}
 .adm-lbl{font-size:13px;font-weight:700;color:#55566a}
-.adm-note{margin-bottom:16px;padding:12px 16px;border-radius:15px;background:#efeafe;color:#3b2a8c;font-size:14px;animation:adm-rise .3s ease both}
+.adm-note{margin-bottom:16px;padding:12px 16px;border-radius:15px;background:#fff0ec;color:#a3321c;font-size:14px;animation:adm-rise .3s ease both}
 .adm-empty{color:#8a8aa3;font-size:14px}
 .adm-err{margin-bottom:14px;padding:12px 16px;border-radius:15px;background:#fff0ee;color:#c8321a;font-weight:600}
 @keyframes adm-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.adm *{animation:none!important;transition:none!important}}
 @media(max-width:860px){
   .adm{grid-template-columns:1fr}
-  .adm-side{position:static;height:auto;flex-direction:row;overflow-x:auto;gap:8px;padding:10px 12px;border-right:0;border-bottom:1px solid #ebe7f6;white-space:nowrap;align-items:center}
-  .adm-side > div{display:flex;gap:6px;flex:none}
-  .adm-cap{display:none}
-  .adm-nav{width:auto;min-height:38px;flex:none;border-radius:99px;background:#f4f1ff;color:#3b2a8c;padding:0 14px}
-  .adm-nav.on{background:#5b3fd6;color:#fff}
-  .adm-back{display:none}
-  .adm-brand{display:none}
+  .adm-side{position:fixed;top:0;left:0;bottom:0;width:272px;max-width:86vw;z-index:90;height:100vh;transform:translateX(-102%);transition:transform .25s ease;box-shadow:12px 0 40px rgba(20,20,43,.18);padding:20px 14px}
+  .adm-side.open{transform:translateX(0)}
+  .adm-scrim{position:fixed;inset:0;background:rgba(20,20,43,.35);z-index:80}
+  .adm-burger{display:grid!important}
+  .adm-nav{width:100%;min-height:44px}
   .adm-main{padding:14px 14px 40px}
-  .adm-top{flex-wrap:wrap}
+  .adm-top{flex-wrap:nowrap;gap:8px}
   .adm-me{display:none}
+  .adm-search{min-width:0}
   .adm h1{font-size:22px}
   .adm-kpis{grid-template-columns:1fr 1fr;gap:10px}
-  .adm-kpi strong{font-size:22px}
-  .adm-table th,.adm-table td{padding:10px 6px;font-size:13px}
+  .adm-kpi strong{font-size:20px}
+  .adm-table{display:block;overflow-x:auto;white-space:nowrap}
 }
 `;
 
@@ -136,6 +136,9 @@ function Simulator() {
 
 export default function AdminPage() {
   const [step, setStep] = useState<Step>("overview");
+  const [navOpen, setNavOpen] = useState(false);
+  const [selected, setSelected] = useState<Merchant | null>(null);
+  const [credit, setCredit] = useState({ currency: "CDF", amount: "", reason: "" });
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -206,12 +209,13 @@ export default function AdminPage() {
     <main className="adm">
       <style>{CSS}</style>
 
-      <aside className="adm-side">
+      {navOpen && <div className="adm-scrim" onClick={() => setNavOpen(false)} />}
+      <aside className={`adm-side${navOpen ? " open" : ""}`}>
         {NAV.map((g) => (
           <div key={g.group}>
             <p className="adm-cap">{g.group}</p>
             {g.items.map((it) => (
-              <button key={it.id} className={`adm-nav${step === it.id ? " on" : ""}`} aria-current={step === it.id ? "page" : undefined} onClick={() => { setStep(it.id); setNotice(""); }}>
+              <button key={it.id} className={`adm-nav${step === it.id ? " on" : ""}`} aria-current={step === it.id ? "page" : undefined} onClick={() => { setStep(it.id); setNotice(""); setNavOpen(false); }}>
                 <span>{it.label}</span>
                 {counts[it.id] ? <em>{counts[it.id]}</em> : null}
               </button>
@@ -223,6 +227,7 @@ export default function AdminPage() {
 
       <div className="adm-main">
         <header className="adm-top">
+          <button className="adm-burger" aria-label="Ouvrir le menu" onClick={() => setNavOpen(true)}>☰</button>
           <input className="adm-search" placeholder="Rechercher un marchand, un utilisateur…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Rechercher un marchand" />
           <div className="adm-bell" aria-label="Notifications">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
@@ -264,7 +269,7 @@ export default function AdminPage() {
                   <thead><tr><th>Marchand</th><th>Montant encaissé</th><th>Réussies</th><th>En attente</th><th>Échouées</th></tr></thead>
                   <tbody>
                     {merchants.map((m) => (
-                      <tr key={m.owner_id}>
+                      <tr key={m.owner_id} onClick={() => setSelected(m)} style={{ cursor: "pointer" }}>
                         <td>{m.email || m.owner_id.slice(0, 8)}</td>
                         <td><strong>{Object.entries(m.volume as Record<string, number>).map(([c, v]) => `${fmt(Number(v))} ${c}`).join(" · ") || "0"}</strong></td>
                         <td>{m.successful_count}</td>
@@ -491,12 +496,38 @@ export default function AdminPage() {
             <h1>{step === "merchants" ? "Comptes marchands" : "Transactions"}</h1>
             <p className="adm-sub">Activité de chaque marchand : montants, réussies, en attente, échouées.</p>
             <div className="adm-panel">
+                {selected ? (
+                  <div style={{ display: "grid", gap: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                      <strong style={{ fontSize: 16 }}>{selected.email || selected.owner_id}</strong>
+                      <button className="adm-btn g" onClick={() => setSelected(null)}>Fermer</button>
+                    </div>
+                    <div className="adm-list">
+                      <span>Réussies : {selected.successful_count} · En attente : {selected.pending_count} · Échouées : {selected.failed_count}</span>
+                      <span>Volume : {Object.entries(selected.volume as Record<string, number>).map(([c, v]) => `${fmt(Number(v))} ${c}`).join(" · ") || "0"}</span>
+                    </div>
+                    <div className="adm-row">
+                      <button className="adm-btn" disabled={busy} onClick={() => act({ action: "set_account_status", owner_id: selected.owner_id, status: "suspended" }, "Compte suspendu : paiements et retraits bloqués.")}>Suspendre</button>
+                      <button className="adm-btn" disabled={busy} onClick={() => act({ action: "set_account_status", owner_id: selected.owner_id, status: "banned", days: 30 }, "Compte bloqué pour 30 jours : retraits bloqués.")}>Bannir 30 jours</button>
+                      <button className="adm-btn g" disabled={busy} onClick={() => act({ action: "set_account_status", owner_id: selected.owner_id, status: "active" }, "Compte réactivé.")}>Réactiver</button>
+                    </div>
+                    <div style={{ display: "grid", gap: 8, borderTop: "1px solid #f1eff7", paddingTop: 12 }}>
+                      <strong>Créditer un montant de test</strong>
+                      <input className="adm-in" placeholder="Devise (ex. CDF)" value={credit.currency} onChange={(e) => setCredit({ ...credit, currency: e.target.value.toUpperCase() })} />
+                      <input className="adm-in" inputMode="decimal" placeholder="Montant" value={credit.amount} onChange={(e) => setCredit({ ...credit, amount: e.target.value })} />
+                      <input className="adm-in" placeholder="Motif (obligatoire)" value={credit.reason} onChange={(e) => setCredit({ ...credit, reason: e.target.value })} />
+                      <button className="adm-btn" disabled={busy || !credit.amount || !credit.reason} onClick={() => act({ action: "credit_wallet", owner_id: selected.owner_id, currency: credit.currency, amount: Number(credit.amount), reason: credit.reason }, "Montant crédité.")}>Créditer</button>
+                    </div>
+                  </div>
+                ) : <p className="adm-empty" style={{ margin: 0 }}>Clique sur un marchand pour voir sa fiche et ses actions.</p>}
+              </div>
+              <div className="adm-panel">
               <div className="adm-table-wrap">
                 <table className="adm-table">
                   <thead><tr><th>Marchand</th><th>Montant encaissé</th><th>Réussies</th><th>En attente</th><th>Échouées</th></tr></thead>
                   <tbody>
                     {merchants.map((m) => (
-                      <tr key={m.owner_id}>
+                      <tr key={m.owner_id} onClick={() => setSelected(m)} style={{ cursor: "pointer" }}>
                         <td>{m.email || m.owner_id.slice(0, 8)}</td>
                         <td><strong>{Object.entries(m.volume as Record<string, number>).map(([c, v]) => `${fmt(Number(v))} ${c}`).join(" · ") || "0"}</strong></td>
                         <td>{m.successful_count}</td>
