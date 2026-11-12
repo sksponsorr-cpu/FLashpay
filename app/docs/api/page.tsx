@@ -310,7 +310,7 @@ function ApiDocumentationContent() {
 
           <section id="frais">
             <h2>Frais</h2>
-            <div className="fp-docs-note">Le payeur règle <strong>2,5 %</strong> en plus du montant demandé. Sans abonnement, la commission est de <strong>6 %</strong>. Basic applique 1 % jusqu’à 200 000 FCFA encaissés par mois, puis 6 %. Premium applique 1 % jusqu’à 500 000 FCFA encaissés par mois, puis 6 %.</div>
+            <div className="fp-docs-note">Le payeur règle le <strong>taux affiché dans la tarification</strong> pour le moyen de paiement choisi (taux du réseau plus la marge FlashPay), avec le minimum du réseau quand il s’applique. Ce montant est identique sur la page hébergée et sur l’appel direct. Avec <code>pass_digital_charge: false</code>, le payeur ne règle aucun frais. La commission FlashPay est de <strong>6 %</strong> du montant demandé, prélevée sur ce que tu reçois.</div>
           </section>
 
           <section id="erreurs">
