@@ -100,6 +100,19 @@ export async function POST(request: Request) {
 
   const row = Array.isArray(data) ? data[0] : data;
 
+  // Notification immédiate : la demande est enregistrée et en cours de traitement.
+  try {
+    await supabase.from("user_notifications").insert({
+      owner_id: user.id,
+      kind: "withdrawal",
+      title: "Retrait en cours de traitement",
+      body: `Ta demande de retrait de ${body.amount} ${body.currency_code} a bien été enregistrée.`,
+      reference: row?.out_id ?? null,
+    });
+  } catch {
+    // Jamais bloquant.
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY;
