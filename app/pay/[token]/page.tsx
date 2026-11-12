@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { clientFeeFor, ISO_BY_COUNTRY_NAME, networksFor } from "@/lib/client-fees";
 import { FLASHPAY_MARGIN_POINTS } from "@/lib/fee-schedule";
+import BrandLoader from "@/components/brand-loader";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -123,6 +124,17 @@ function PayContent() {
   const [txId, setTxId] = useState("");
   const [waitStatus, setWaitStatus] = useState<"" | "pending" | "successful" | "failed">("");
   const [secondsLeft, setSecondsLeft] = useState(30);
+  const [brand, setBrand] = useState<{ name: string; logo_url: string | null; color: string | null } | null>(null);
+  // Statistiques de conversion : une visite par chargement de la page (sans donnée personnelle).
+  useEffect(() => {
+    fetch(`/api/pay/${encodeURIComponent(token)}/view`, { method: "POST", keepalive: true }).catch(() => {});
+  }, [token]);
+  useEffect(() => {
+    fetch(`/api/pay/${encodeURIComponent(token)}/brand`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => { if (d.brand) setBrand(d.brand); })
+      .catch(() => {});
+  }, [token]);
 
   useEffect(() => {
     (async () => {
@@ -296,12 +308,13 @@ function PayContent() {
       <style>{css}</style>
       <div className="pg-card">
         <div className="pg-top">
-          <div className="pg-brand"><span className="pg-logo">f</span><span>flash<span style={{ color: "#5b3fd6" }}>pay</span></span></div>
+          <div className="pg-brand">{brand?.logo_url ? <img src={brand.logo_url} alt={brand.name} style={{ height: 40, maxWidth: 160, objectFit: "contain" }} /> : <><span className="pg-logo">f</span><span>flash<span style={{ color: "#5b3fd6" }}>pay</span></span></>}</div>
+          {brand?.color && <style>{`.pg-btn:not(.pg-ghost){background:${brand.color} !important}`}</style>}
           {link?.mode === "test" && <span className="pg-test">Mode test</span>}
         </div>
 
         {notFound && <p className="pg-sub" style={{ marginTop: 18 }}>Ce lien de paiement n’existe pas.</p>}
-        {!notFound && !link && <p className="pg-sub" style={{ marginTop: 18 }}>Chargement…</p>}
+        {!notFound && !link && <div style={{ marginTop: 18 }}><BrandLoader /></div>}
 
         {link && (
           <>
