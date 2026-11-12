@@ -51,7 +51,7 @@ export default function AccountMenu({ onSettings }: { onSettings: () => void }) 
             <span className="am-id"><strong>{name}</strong><small>{email}</small></span>
           </div>
           <button className="am-item" onClick={() => { setOpen(false); onSettings(); }}>Paramètres</button>
-          <a className="am-item" href="/docs/api">Support</a>
+          <a className="am-item" href="/support">Support</a>
           <button className="am-item am-danger" onClick={() => void signOut()}>Déconnexion</button>
         </div>
       )}

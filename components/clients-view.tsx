@@ -1,81 +1,68 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type Row = { customer_name: string | null; customer_phone: string | null; amount: number; currency_code: string; status: string; created_at: string };
-type Client = { phone: string; name: string; count: number; successful: number; totals: Record<string, number>; last: string };
+type Tx = { transaction_id: string; amount: number; currency_code: string; country_code: string; status: string; customer_name: string | null; customer_phone: string | null; created_at: string };
+type Client = { key: string; name: string; phone: string; country: string; count: number; successful: number; total: Record<string, number>; last: string };
 
-const fmt = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n);
-
+// Clients de l'application : les payeurs, regroupés par numéro de téléphone.
 export default function ClientsView({ appId }: { appId: string }) {
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [error, setError] = useState("");
+  const [txs, setTxs] = useState<Tx[]>([]);
   const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data, error: queryError } = await createClient()
-          .from("transactions")
-          .select("customer_name,customer_phone,amount,currency_code,status,created_at")
-          .eq("app_id", appId)
-          .eq("environment", "live")
-          .not("customer_phone", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(5000);
-        if (queryError) throw queryError;
-        if (!cancelled) setRows((data ?? []) as Row[]);
-      } catch {
-        if (!cancelled) setError("Impossible de charger les clients.");
-      }
-    })();
-    return () => { cancelled = true; };
+    let alive = true;
+    setLoading(true);
+    createClient().from("transactions")
+      .select("transaction_id, amount, currency_code, country_code, status, customer_name, customer_phone, created_at")
+      .eq("app_id", appId).order("created_at", { ascending: false }).limit(1000)
+      .then(({ data }) => { if (alive) { setTxs((data as Tx[]) ?? []); setLoading(false); } });
+    return () => { alive = false; };
   }, [appId]);
 
-  const clients = useMemo(() => {
+  const clients = useMemo<Client[]>(() => {
     const map = new Map<string, Client>();
-    for (const r of rows ?? []) {
-      if (!r.customer_phone) continue;
-      const c = map.get(r.customer_phone) ?? { phone: r.customer_phone, name: r.customer_name ?? "", count: 0, successful: 0, totals: {}, last: r.created_at };
+    for (const t of txs) {
+      const key = t.customer_phone || t.transaction_id;
+      const c = map.get(key) ?? { key, name: t.customer_name || "—", phone: t.customer_phone || "—", country: t.country_code, count: 0, successful: 0, total: {} as Record<string, number>, last: t.created_at };
       c.count += 1;
-      if (r.status === "successful") {
-        c.successful += 1;
-        c.totals[r.currency_code] = (c.totals[r.currency_code] ?? 0) + Number(r.amount);
-      }
-      if (!c.name && r.customer_name) c.name = r.customer_name;
-      map.set(r.customer_phone, c);
+      if (t.status === "successful") { c.successful += 1; c.total[t.currency_code] = (c.total[t.currency_code] ?? 0) + Number(t.amount); }
+      if (t.created_at > c.last) c.last = t.created_at;
+      map.set(key, c);
     }
-    return Array.from(map.values()).sort((a, b) => (a.last < b.last ? 1 : -1));
-  }, [rows]);
+    return [...map.values()].sort((a, b) => (a.last < b.last ? 1 : -1));
+  }, [txs]);
 
-  const visible = clients.filter((c) => {
-    const q = query.trim().toLowerCase();
-    return !q || c.phone.includes(q) || c.name.toLowerCase().includes(q);
-  });
-
-  if (error) return <p className="tx-msg tx-error">{error}</p>;
-  if (!rows) return <p className="tx-msg">Chargement…</p>;
+  const shown = clients.filter((c) => (c.name + c.phone).toLowerCase().includes(query.trim().toLowerCase()));
+  const th: CSSProperties = { textAlign: "left", padding: "10px 8px", fontSize: 12, color: "#8a8aa3", fontWeight: 700 };
+  const td: CSSProperties = { padding: "12px 8px", borderTop: "1px solid #f1eff7", fontSize: 14 };
 
   return (
-    <div className="tx-wrap">
-      <input className="tx-search" type="search" placeholder="Rechercher par nom ou téléphone" value={query} onChange={(e) => setQuery(e.target.value)} />
-      {visible.length === 0 && <p className="tx-msg">Aucun client pour le moment. Les clients apparaissent après leur premier paiement.</p>}
-      {visible.map((c) => (
-        <div className="tx-row" key={c.phone}>
-          <div className="tx-main">
-            <strong>{c.name || "Client sans nom"}</strong>
-            <span className="tx-ref">{c.phone}</span>
-            <span className="tx-date">Dernier paiement : {new Date(c.last).toLocaleString("fr-FR")}</span>
-          </div>
-          <div className="tx-side">
-            <span className="tx-net">{c.successful} réussi(s) / {c.count}</span>
-            {Object.entries(c.totals).map(([cur, total]) => (
-              <strong key={cur}>{fmt(total)} {cur}</strong>
-            ))}
-          </div>
+    <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher par nom ou téléphone" style={{ flex: 1, minWidth: 200, minHeight: 44, border: "1px solid #e4e1ef", borderRadius: 14, padding: "0 14px", font: "inherit" }} />
+        <a href={`/releve?app=${encodeURIComponent(appId)}`} target="_blank" rel="noopener" style={{ display: "inline-flex", alignItems: "center", minHeight: 44, padding: "0 18px", borderRadius: 14, background: "#e8472a", color: "#fff", fontWeight: 700, textDecoration: "none" }}>Relevé imprimable</a>
+      </div>
+      {loading ? <p style={{ color: "#8a8aa3", fontSize: 14 }}>Chargement…</p> : shown.length === 0 ? <p style={{ color: "#8a8aa3", fontSize: 14 }}>Aucun client pour le moment.</p> : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={th}>Client</th><th style={th}>Téléphone</th><th style={th}>Pays</th><th style={th}>Paiements</th><th style={th}>Total réussi</th><th style={th}>Dernier</th></tr></thead>
+            <tbody>
+              {shown.map((c) => (
+                <tr key={c.key}>
+                  <td style={td}><strong>{c.name}</strong></td>
+                  <td style={td}>{c.phone}</td>
+                  <td style={td}>{c.country}</td>
+                  <td style={td}>{c.successful} / {c.count}</td>
+                  <td style={td}>{Object.entries(c.total).map(([cur, v]) => `${Number(v).toLocaleString("fr-FR")} ${cur}`).join(" · ") || "—"}</td>
+                  <td style={td}>{new Date(c.last).toLocaleDateString("fr-FR")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 import MfaSetup from "@/components/mfa-setup";
+import TeamView from "@/components/team-view";
 import ChangePassword from "@/components/change-password";
 import { useEffect, useState } from "react";
 import IdentityForm from "@/components/identity-form";
@@ -18,7 +19,7 @@ const verifLabel: Record<string, string> = {
 import AvatarUpload from "@/components/avatar-upload";
 
 export default function SettingsView({ appId, initialTab = "app" }: { appId: string; initialTab?: "app" | "verif" | "security" }) {
-  const [tab, setTab] = useState<"app" | "verif" | "security">(initialTab);
+  const [tab, setTab] = useState<"app" | "verif" | "security" | "team">(initialTab);
   const [app, setApp] = useState<App | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
@@ -82,6 +83,7 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
         <button role="tab" aria-selected={tab === "app"} className={tab === "app" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("app")}>Application</button>
         <button role="tab" aria-selected={tab === "verif"} className={tab === "verif" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("verif")}>Vérification</button>
         <button role="tab" aria-selected={tab === "security"} className={tab === "security" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("security")}>Sécurité</button>
+        <button role="tab" aria-selected={tab === "team"} className={tab === "team" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("team")}>Équipe</button>
       </div>
 
       {tab === "app" && (
@@ -122,6 +124,7 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
         </div>
       )}
 
+      {tab === "team" && <TeamView />}
       {tab === "security" && (
         <>
           <MfaSetup />
