@@ -11,6 +11,7 @@ import StatsView from "@/components/stats-view";
 import PricingView from "@/components/pricing-view";
 import WebhookJournalView from "@/components/webhook-journal-view";
 import DisputesView from "@/components/disputes-view";
+import ConversionStats from "@/components/conversion-stats";
 import WalletOverview from "@/components/wallet-overview";
 import TestFunds from "@/components/test-funds";
 import WithdrawalsView from "@/components/withdrawals-view";
@@ -30,6 +31,7 @@ const sections = [
   { id: "stats", label: "Statistiques", icon: TrendingUp },
   { id: "webhook-journal", label: "Journal des webhooks", icon: Code2 },
   { id: "disputes", label: "Litiges", icon: Percent },
+  { id: "checkout", label: "Checkout", icon: Settings },
   { id: "withdrawals", label: "Retraits", icon: Wallet },
   { id: "developers", label: "Développeurs", icon: Code2 },
   { id: "pricing", label: "Tarification", icon: Percent }, { id: "subs", label: "Abonnements", icon: Percent },
@@ -118,8 +120,9 @@ function DashboardContent() {
         {appId&&active==="overview"&&<><TestFunds appId={appId}/><WalletOverview appId={appId} autoWithdraw={false} onSubmitted={()=>setActive("withdrawals")}/></>}
         {appId&&active==="wallet"&&<><TestFunds appId={appId}/><WalletOverview appId={appId} autoWithdraw={autoWithdraw} onSubmitted={(mode)=>setActive(mode==="withdraw"?"withdrawals":"wallet")}/></>}
         {appId&&active==="transactions"&&<section className="dash-card"><h2>Toutes les transactions</h2><TransactionsList appId={appId}/></section>}
-        {appId&&active==="stats"&&<section className="dash-card"><h2>Statistiques</h2><StatsView appId={appId}/></section>}
+        {appId&&active==="stats"&&<section className="dash-card"><h2>Statistiques</h2><ConversionStats appId={appId}/><StatsView appId={appId}/></section>}
         {appId&&active==="webhook-journal"&&<section className="dash-card"><h2>Journal des webhooks</h2><WebhookJournalView/></section>}
+        {active==="checkout"&&<section className="dash-card"><h2>Checkout</h2><p>Logo et couleur de la page de paiement de tes clients.</p><a href="/branding" className="dash-link-btn">Personnaliser le checkout</a></section>}
         {appId&&active==="disputes"&&<section className="dash-card"><h2>Litiges</h2><DisputesView appId={appId}/></section>}
         {appId&&active==="withdrawals"&&<WithdrawalsView appId={appId} onNew={()=>{setAutoWithdraw(true);setActive("wallet")}}/>}
         {appId&&active==="developers"&&<section className="dev-wrap">
