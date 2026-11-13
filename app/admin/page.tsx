@@ -14,7 +14,15 @@ type Merchant = { owner_id: string; email: string; successful_count: number; pen
 type Client = { id: string; full_name: string; country_code: string | null; verification_status: string; created_at: string; email: string };
 type Movement = { id: string; owner_id: string; currency_code: string; kind: string; amount: number; balance_after: number; reference: string; created_at: string; email: string };
 type Reference = { transaction_id: string; owner_id: string; amount: number; currency_code: string; status: string; country_code: string; payment_method: string | null; processing_fee: number | null; purpose: string | null; created_at: string; email: string };
-type Ticket = { id: string; owner_id: string; subject: string; message: string; status: string; created_at: string; email: string };
+type TicketMessage = { id: string; ticket_id: string; author: "merchant" | "admin"; body: string; created_at: string };
+type Ticket = { id: string; owner_id: string; subject: string; message: string; status: string; created_at: string; email: string; messages?: TicketMessage[] };
+
+const QUICK_REPLIES = [
+  "Bonjour, merci pour ton message. Nous examinons ta demande.",
+  "Peux-tu nous indiquer la référence de la transaction concernée ?",
+  "Ta demande a bien été traitée. N’hésite pas à revenir vers nous si besoin.",
+  "Nous revenons vers toi dès que la vérification est terminée.",
+];
 type Data = { margin_points?: number; clients?: Client[]; interwallet?: Movement[]; references?: Reference[]; tickets?: Ticket[]; profit?: Record<string, number>; withdrawals: Withdrawal[]; conversions: Conversion[]; rates: Rate[]; minimums: Minimum[]; accounts: Account[]; identities: Identity[]; overview?: { users: number; transactions: { total: number; successful: number; pending: number; failed: number }; withdrawals: { total: number; delivered: number; pending: number; not_delivered: number }; merchants: Merchant[] } };
 type Step = "overview" | "tx_stats" | "finance" | "treasury" | "kyc" | "transactions" | "direct_ops" | "withdrawals" | "simulator" | "merchants" | "clients" | "interwallet" | "support" | "conversions" | "rates" | "ids" | "subs";
 
@@ -28,87 +36,83 @@ const NAV: { group: string; items: { id: Step; label: string }[] }[] = [
 ];
 
 const CSS = `
-.adm{min-height:100vh;display:grid;grid-template-columns:260px minmax(0,1fr);background:#f6f5fb;color:#17162b;font-family:inherit;color-scheme:light}
+.adm{--bg:#f5f5f7;--card:rgba(255,255,255,.86);--ink:#1d1d1f;--ink2:#6e6e73;--ink3:#8e8e93;--line:rgba(60,60,67,.12);--brand:#e8472a;--brand-soft:rgba(232,71,42,.10);--shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px -12px rgba(0,0,0,.10);min-height:100vh;display:grid;grid-template-columns:248px minmax(0,1fr);background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;color-scheme:light;letter-spacing:-.011em}
 .adm *{box-sizing:border-box}
-.adm-side{position:sticky;top:0;height:100vh;overflow-y:auto;background:#fff;border-right:1px solid #ebe7f6;padding:24px 16px;display:flex;flex-direction:column;gap:20px}
-.adm-brand{display:flex;align-items:center;gap:10px;padding:0 8px;font-size:18px;font-weight:800;letter-spacing:-.01em;color:#14142b}
-.adm-brand small{font-size:12px;font-weight:700;color:#e8472a;margin-left:2px}
-.adm-logo{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:linear-gradient(145deg,#7c5be6,#e8472a);color:#fff;font-weight:800;box-shadow:0 10px 22px -10px rgba(91,63,214,.8)}
-.adm-cap{margin:0 0 8px;padding:0 10px;color:#9a97b0;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.adm-nav{width:100%;display:flex;align-items:center;justify-content:space-between;min-height:42px;padding:0 12px;border:0;border-radius:14px;background:transparent;color:#55566a;font:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s ease,color .2s ease,transform .2s ease}
-.adm-nav:hover{background:#fff5f2;color:#a3321c;transform:translateX(2px)}
-.adm-nav.on{background:#e8472a;color:#fff;box-shadow:0 12px 26px -14px rgba(91,63,214,.9)}
-.adm-nav em{font-style:normal;min-width:22px;height:20px;padding:0 6px;border-radius:99px;background:#ffe6de;color:#e8472a;font-size:11px;font-weight:800;display:grid;place-items:center}
-.adm-nav.on em{background:#fff;color:#e8472a}
-.adm-back{margin-top:auto;padding:0 10px;color:#e8472a;font-size:13px;font-weight:700;text-decoration:none}
-.adm-main{min-width:0;padding:24px 30px 52px}
-.adm-top{display:flex;align-items:center;gap:12px;margin-bottom:26px}
-.adm-search{flex:1;min-width:0;height:46px;border:1px solid #ebe7f6;border-radius:16px;background:#fff;padding:0 16px;font:inherit;font-size:14px;outline:0;transition:border .2s ease,box-shadow .2s ease}
-.adm-search:focus{border-color:#8f7ae8;box-shadow:0 0 0 4px #fff0ec}
-.adm-burger{display:none;width:46px;height:46px;flex:none;border:1px solid #ebe7f6;border-radius:16px;background:#fff;place-items:center;cursor:pointer;color:#14142b}
-.adm-bell{position:relative;width:46px;height:46px;flex:none;border:1px solid #ebe7f6;border-radius:16px;background:#fff;display:grid;place-items:center;color:#14142b;cursor:default}
-.adm-bell i{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:#e8472a;color:#fff;font-size:11px;font-weight:800;font-style:normal;display:grid;place-items:center;box-shadow:0 0 0 2px #f6f5fb}
-.adm-me{display:flex;align-items:center;gap:10px;height:46px;padding:0 16px 0 6px;border:1px solid #ebe7f6;border-radius:16px;background:#fff;font-size:14px;font-weight:700;color:#2d2540;white-space:nowrap}
-.adm-me b{display:grid;width:34px;height:34px;place-items:center;border-radius:50%;background:linear-gradient(145deg,#ff7a4f,#e8472a);color:#fff;font-size:13px}
-.adm h1{margin:0;font-size:28px;font-weight:800;letter-spacing:-.02em}
-.adm-sub{margin:6px 0 24px;color:#7a7590;font-size:14px;line-height:1.5}
-.adm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-bottom:22px}
-.adm-kpi{display:grid;gap:10px;padding:20px 22px;border-radius:22px;background:#fff;border:1px solid #ebe7f6;box-shadow:0 14px 34px -22px rgba(30,20,70,.35);animation:adm-rise .5s ease both}
-.adm-kpi span{font-size:13px;font-weight:600;color:#6b6680}
-.adm-kpi strong{font-size:30px;font-weight:800;letter-spacing:-.02em}
-.adm-kpi small{color:#8a8aa3;font-size:12px;line-height:1.4}
-.adm-kpi.violet{background:linear-gradient(160deg,#fff5f2,#ebe5ff);border-color:#ffd6cc}
-.adm-kpi.mint{background:linear-gradient(160deg,#eefaf5,#e0f5ec);border-color:#c9ecdb}
-.adm-kpi.amber{background:linear-gradient(160deg,#fff8ea,#fdf0d2);border-color:#f3dfae}
-.adm-kpi.rose{background:linear-gradient(160deg,#fff2f0,#ffe3dc);border-color:#f6cfc6}
-.adm-panel{background:#fff;border:1px solid #ebe7f6;border-radius:22px;padding:20px 22px;box-shadow:0 14px 34px -22px rgba(30,20,70,.3);margin-bottom:18px}
-.adm-panel h2{margin:0 0 4px;font-size:16px;font-weight:800}
-.adm-panel > p{margin:0 0 16px;color:#8a8aa3;font-size:13px}
-.adm-cur{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.adm-cur div{padding:16px;border-radius:16px;background:#faf9fd;border:1px solid #f1eff7;display:grid;gap:6px}
-.adm-cur span{color:#8a8aa3;font-size:12px;font-weight:700}
-.adm-cur strong{font-size:18px;font-weight:800}
-.adm-table-wrap{overflow-x:auto}
+.adm-side{position:sticky;top:0;height:100vh;overflow-y:auto;background:rgba(255,255,255,.72);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-right:1px solid var(--line);padding:22px 14px;display:flex;flex-direction:column;gap:22px}
+.adm-brand{display:flex;align-items:center;gap:10px;padding:0 8px;font-size:17px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+.adm-brand small{font-size:11px;font-weight:600;color:var(--brand);margin-left:2px;text-transform:uppercase;letter-spacing:.06em}
+.adm-logo{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:var(--brand);color:#fff;font-weight:700;font-size:14px}
+.adm-cap{margin:0 0 6px;padding:0 10px;color:var(--ink3);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.adm-nav{width:100%;display:flex;align-items:center;justify-content:space-between;min-height:36px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s ease,color .2s ease}
+.adm-nav:hover{background:rgba(0,0,0,.045)}
+.adm-nav.on{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.adm-nav em{font-style:normal;min-width:20px;height:18px;padding:0 6px;border-radius:99px;background:rgba(0,0,0,.06);color:var(--ink2);font-size:11px;font-weight:600;display:grid;place-items:center}
+.adm-nav.on em{background:var(--brand);color:#fff}
+.adm-back{margin-top:auto;padding:0 10px;color:var(--brand);font-size:13px;font-weight:500;text-decoration:none}
+.adm-main{min-width:0;padding:28px 36px 64px;max-width:1280px}
+.adm-top{display:flex;align-items:center;gap:10px;margin-bottom:30px}
+.adm-search{flex:1;min-width:0;height:38px;border:0;border-radius:10px;background:rgba(118,118,128,.12);padding:0 14px;font:inherit;font-size:14px;color:var(--ink);outline:0;transition:box-shadow .2s ease,background .2s ease}
+.adm-search::placeholder{color:var(--ink3)}
+.adm-search:focus{background:#fff;box-shadow:0 0 0 3px rgba(232,71,42,.25)}
+.adm-burger{display:none;width:38px;height:38px;flex:none;border:0;border-radius:10px;background:rgba(118,118,128,.12);place-items:center;cursor:pointer;color:var(--ink);font-size:16px}
+.adm-bell{position:relative;width:38px;height:38px;flex:none;border:0;border-radius:50%;background:rgba(118,118,128,.12);display:grid;place-items:center;color:var(--ink)}
+.adm-bell i{position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--brand);color:#fff;font-size:11px;font-weight:700;font-style:normal;display:grid;place-items:center;box-shadow:0 0 0 2px var(--bg)}
+.adm-me{display:flex;align-items:center;gap:8px;height:38px;padding:0 14px 0 4px;border-radius:999px;background:rgba(118,118,128,.12);font-size:13px;font-weight:500;color:var(--ink);white-space:nowrap}
+.adm-me b{display:grid;width:30px;height:30px;place-items:center;border-radius:50%;background:var(--brand);color:#fff;font-size:12px;font-weight:600}
+.adm h1{margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em}
+.adm-sub{margin:6px 0 24px;color:var(--ink2);font-size:15px;line-height:1.45}
+.adm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px}
+.adm-kpi{display:grid;gap:8px;padding:20px;border-radius:18px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);animation:adm-rise .5s ease both}
+.adm-kpi span{font-size:13px;font-weight:500;color:var(--ink2)}
+.adm-kpi strong{font-size:28px;font-weight:600;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.adm-kpi small{color:var(--ink3);font-size:12px;line-height:1.4}
+.adm-kpi.violet,.adm-kpi.mint,.adm-kpi.amber,.adm-kpi.rose{background:var(--card)}
+.adm-panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px 24px;box-shadow:var(--shadow);margin-bottom:16px}
+.adm-panel h2{margin:0 0 4px;font-size:17px;font-weight:600;letter-spacing:-.02em}
+.adm-panel > p{margin:0 0 16px;color:var(--ink2);font-size:13px}
+.adm-cur{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.adm-cur div{padding:14px 16px;border-radius:14px;background:rgba(118,118,128,.07);display:grid;gap:4px}
+.adm-cur span{color:var(--ink2);font-size:12px;font-weight:500}
+.adm-cur strong{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.adm-table-wrap{overflow-x:auto;margin:0 -8px}
 .adm-table{width:100%;border-collapse:collapse;font-size:14px}
-.adm-table th,.adm-table td{padding:13px 10px;text-align:left;border-bottom:1px solid #f1eff7;white-space:nowrap}
-.adm-table th{color:#8a8aa3;font-size:12px;font-weight:700}
+.adm-table th,.adm-table td{padding:12px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.adm-table th{color:var(--ink3);font-size:12px;font-weight:600;letter-spacing:.01em}
+.adm-table td{color:var(--ink)}
 .adm-table tbody tr{transition:background .2s ease}
-.adm-table tbody tr:hover{background:#fbfaff}
-.adm-card{background:#fff;border:1px solid #ebe7f6;border-radius:22px;padding:20px;margin-bottom:14px;box-shadow:0 14px 34px -22px rgba(30,20,70,.3);display:grid;gap:12px;animation:adm-rise .45s ease both}
-.adm-card h2{margin:0;font-size:17px;font-weight:800}
-.adm-meta{color:#7a7590;font-size:13px;word-break:break-all}
-.adm-list{display:grid;gap:5px;font-size:14px;color:#55566a}
-.adm-row{display:flex;gap:8px;flex-wrap:wrap}
-.adm-btn{min-height:44px;padding:0 18px;border:0;border-radius:15px;background:#e8472a;color:#fff;font:inherit;font-weight:700;cursor:pointer;transition:transform .15s ease,box-shadow .2s ease,opacity .2s ease;box-shadow:0 12px 24px -14px rgba(232,71,42,.8)}
-.adm-btn:hover{transform:translateY(-1px)}
+.adm-table tbody tr:hover{background:rgba(0,0,0,.025)}
+.adm-table tbody tr[aria-selected="true"]{background:var(--brand-soft)}
+.adm-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 22px;margin-bottom:14px;box-shadow:var(--shadow);display:grid;gap:12px;animation:adm-rise .45s ease both}
+.adm-card h2{margin:0;font-size:16px;font-weight:600;letter-spacing:-.02em}
+.adm-meta{color:var(--ink2);font-size:13px;word-break:break-all}
+.adm-list{display:grid;gap:5px;font-size:14px;color:var(--ink2)}
+.adm-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.adm-btn{min-height:34px;padding:0 16px;border:0;border-radius:999px;background:var(--brand);color:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .2s ease,transform .15s ease,background .2s ease}
+.adm-btn:hover{opacity:.9}
 .adm-btn:active{transform:scale(.97)}
-.adm-btn.g{background:#fff;color:#e8472a;border:1px solid #ffd6cc;box-shadow:none}
-.adm-btn:disabled{opacity:.55;cursor:default;transform:none}
-.adm-in{min-height:46px;width:100%;padding:0 14px;border:1px solid #e4e1ef;border-radius:15px;background:#fbfbfe;font:inherit;font-size:14px;outline:0;transition:border .2s ease,box-shadow .2s ease}
-.adm-in:focus{border-color:#8f7ae8;box-shadow:0 0 0 4px #fff0ec}
-.adm-lbl{font-size:13px;font-weight:700;color:#55566a}
-.adm-note{margin-bottom:16px;padding:12px 16px;border-radius:15px;background:#fff0ec;color:#a3321c;font-size:14px;animation:adm-rise .3s ease both}
-.adm-empty{color:#8a8aa3;font-size:14px}
-.adm-err{margin-bottom:14px;padding:12px 16px;border-radius:15px;background:#fff0ee;color:#c8321a;font-weight:600}
-@keyframes adm-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.adm-btn.g{background:rgba(118,118,128,.13);color:var(--ink)}
+.adm-btn.g:hover{background:rgba(118,118,128,.2)}
+.adm-btn:disabled{opacity:.4;cursor:default;transform:none}
+.adm-in{min-height:40px;width:100%;padding:0 12px;border:0;border-radius:10px;background:rgba(118,118,128,.10);font:inherit;font-size:14px;color:var(--ink);outline:0;transition:box-shadow .2s ease,background .2s ease}
+.adm-in:focus{background:#fff;box-shadow:0 0 0 3px rgba(232,71,42,.25)}
+.adm-lbl{font-size:13px;font-weight:500;color:var(--ink2)}
+.adm-note{margin-bottom:16px;padding:12px 16px;border-radius:12px;background:rgba(52,199,89,.12);color:#1d6b33;font-size:14px;font-weight:500;animation:adm-rise .3s ease both}
+.adm-empty{color:var(--ink3);font-size:14px}
+.adm-err{margin-bottom:14px;padding:12px 16px;border-radius:12px;background:rgba(255,59,48,.10);color:#c7281d;font-weight:500}
+.adm-scrim{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:80}
+@keyframes adm-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.adm *{animation:none!important;transition:none!important}}
 @media(max-width:860px){
   .adm{grid-template-columns:1fr}
-  .adm-side{position:fixed;top:0;left:0;bottom:0;width:272px;max-width:86vw;z-index:90;height:100vh;transform:translateX(-102%);transition:transform .25s ease;box-shadow:12px 0 40px rgba(20,20,43,.18);padding:20px 14px}
+  .adm-side{position:fixed;top:0;left:0;bottom:0;width:272px;max-width:86vw;z-index:90;height:100vh;transform:translateX(-102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);box-shadow:12px 0 40px rgba(0,0,0,.12);padding:20px 14px}
   .adm-side.open{transform:translateX(0)}
-  .adm-scrim{position:fixed;inset:0;background:rgba(20,20,43,.35);z-index:80}
   .adm-burger{display:grid!important}
-  .adm-nav{width:100%;min-height:44px}
+  .adm-nav{min-height:42px}
   .adm-main{padding:14px 14px 40px}
   .adm-top{flex-wrap:nowrap;gap:8px}
   .adm-me{display:none}
-  .adm-search{min-width:0}
-  .adm h1{font-size:22px}
-  .adm-kpis{grid-template-columns:1fr 1fr;gap:10px}
-  .adm-kpi strong{font-size:20px}
-  .adm-table{display:block;overflow-x:auto;white-space:nowrap}
 }
-`;
+`
 
 
 function Simulator() {
@@ -143,6 +147,9 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [replies, setReplies] = useState<Record<string, string>>({});
+  const [bellOpen, setBellOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [query, setQuery] = useState("");
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [convRate, setConvRate] = useState<Record<string, string>>({});
@@ -229,9 +236,26 @@ export default function AdminPage() {
         <header className="adm-top">
           <button className="adm-burger" aria-label="Ouvrir le menu" onClick={() => setNavOpen(true)}>☰</button>
           <input className="adm-search" placeholder="Rechercher un marchand, un utilisateur…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Rechercher un marchand" />
-          <div className="adm-bell" aria-label="Notifications">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
-            {pendingTotal > 0 && <i>{pendingTotal > 9 ? "9+" : pendingTotal}</i>}
+          <div style={{ position: "relative" }}>
+            <button type="button" className="adm-bell" aria-label="Notifications" aria-expanded={bellOpen} onClick={() => setBellOpen((v) => !v)} style={{ cursor: "pointer" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
+              {pendingTotal > 0 && <i>{pendingTotal > 9 ? "9+" : pendingTotal}</i>}
+            </button>
+            {bellOpen && (
+              <div role="dialog" aria-label="Éléments en attente" style={{ position: "absolute", right: 0, top: "115%", width: 280, background: "#fff", borderRadius: 18, boxShadow: "0 24px 60px rgba(30,20,70,.18)", padding: 10, zIndex: 80 }}>
+                {[
+                  { label: "Demandes de support ouvertes", count: (data?.tickets ?? []).length, go: "support" as Step },
+                  { label: "Retraits en attente", count: (data?.withdrawals ?? []).filter((w) => w.status === "pending" || w.status === "scheduled").length, go: "withdrawals" as Step },
+                  { label: "Conversions en attente", count: (data?.conversions ?? []).filter((c) => c.status === "pending").length, go: "conversions" as Step },
+                  { label: "Identités à vérifier", count: (data?.identities ?? []).filter((i) => i.status === "pending").length, go: "kyc" as Step },
+                ].map((row) => (
+                  <button key={row.go} type="button" onClick={() => { setStep(row.go); setBellOpen(false); setNotice(""); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 12px", border: 0, borderRadius: 12, background: "transparent", cursor: "pointer", font: "inherit", color: "#14142b", textAlign: "left" }}>
+                    <span style={{ fontSize: 14 }}>{row.label}</span>
+                    <strong style={{ color: row.count > 0 ? "#e8472a" : "#9a97b0" }}>{row.count}</strong>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="adm-me"><b>A</b>Administrateur</div>
         </header>
@@ -292,7 +316,13 @@ export default function AdminPage() {
             {data && data.withdrawals.length === 0 && <p className="adm-empty">Aucune demande en attente.</p>}
             {data?.withdrawals.map((w) => (
               <div className="adm-card" key={w.id}>
-                <h2>{fmt(w.payout_amount)} {w.currency_code} à verser</h2>
+                <div className="adm-row" style={{ justifyContent: "space-between" }}>
+                  <h2 style={{ margin: 0 }}>{fmt(w.payout_amount)} {w.currency_code} à verser</h2>
+                  <span className="adm-meta" style={{ fontWeight: 600, color: w.status === "failed" ? "#c7281d" : w.status === "processing" ? "#1d6b33" : "#6e6e73" }}>
+                    {({ pending: "Demande", scheduled: "Envoi automatique prévu", sending: "Envoi automatique en cours", processing: "Envoyé", failed: "Échec automatique : à payer manuellement" } as Record<string, string>)[w.status] ?? w.status}
+                  </span>
+                </div>
+                {w.last_error && <div className="adm-list" style={{ color: "#c7281d" }}><span>{w.last_error}</span></div>}
                 <div className="adm-list"><span>Demandé : {fmt(w.requested_amount)} {w.currency_code} · frais : {fmt(w.fee_amount)}</span><span>{dateFmt(w.created_at)}</span></div>
                 <div className="adm-list">
                   <span>Bénéficiaire : <strong>{w.destination_name ?? "non renseigné"}</strong></span>
@@ -300,8 +330,10 @@ export default function AdminPage() {
                   <span>Pays : {w.destination_country ?? "—"} · Opérateur : {w.destination_operator ?? "—"}</span>
                 </div>
                 <div className="adm-row">
-                  <button className="adm-btn" disabled={busy} onClick={() => act({ action: "mark_withdrawal_paid", id: w.id }, "Retrait marqué comme payé.")}>Marquer payé</button>
-                  <button className="adm-btn g" disabled={busy} onClick={() => act({ action: "reject_withdrawal", id: w.id }, "Retrait rejeté.")}>Rejeter</button>
+                  <button className="adm-btn" disabled={busy || w.status === "sending"} onClick={() => act({ action: "mark_withdrawal_paid", id: w.id }, "Retrait payé : solde débité et marchand notifié.")}>Marquer payé (débiter le solde)</button>
+                  {(w.status === "pending" || w.status === "scheduled" || w.status === "failed") && (
+                    <button className="adm-btn g" disabled={busy} onClick={() => act({ action: "reject_withdrawal", id: w.id }, "Retrait rejeté.")}>Rejeter</button>
+                  )}
                 </div>
               </div>
             ))}
@@ -512,11 +544,14 @@ export default function AdminPage() {
                       <button className="adm-btn g" disabled={busy} onClick={() => act({ action: "set_account_status", owner_id: selected.owner_id, status: "active" }, "Compte réactivé.")}>Réactiver</button>
                     </div>
                     <div style={{ display: "grid", gap: 8, borderTop: "1px solid #f1eff7", paddingTop: 12 }}>
-                      <strong>Créditer un montant de test</strong>
+                      <strong>Ajustement manuel du solde</strong>
                       <input className="adm-in" placeholder="Devise (ex. CDF)" value={credit.currency} onChange={(e) => setCredit({ ...credit, currency: e.target.value.toUpperCase() })} />
                       <input className="adm-in" inputMode="decimal" placeholder="Montant" value={credit.amount} onChange={(e) => setCredit({ ...credit, amount: e.target.value })} />
                       <input className="adm-in" placeholder="Motif (obligatoire)" value={credit.reason} onChange={(e) => setCredit({ ...credit, reason: e.target.value })} />
-                      <button className="adm-btn" disabled={busy || !credit.amount || !credit.reason} onClick={() => act({ action: "credit_wallet", owner_id: selected.owner_id, currency: credit.currency, amount: Number(credit.amount), reason: credit.reason }, "Montant crédité.")}>Créditer</button>
+                      <div className="adm-row">
+                        <button className="adm-btn" disabled={busy || !credit.amount || !credit.reason} onClick={() => act({ action: "credit_wallet", owner_id: selected.owner_id, currency: credit.currency, amount: Number(credit.amount), reason: credit.reason }, "Montant crédité.")}>Créditer</button>
+                        <button className="adm-btn g" disabled={busy || !credit.amount || !credit.reason} onClick={() => act({ action: "debit_wallet", owner_id: selected.owner_id, currency: credit.currency, amount: Number(credit.amount), reason: credit.reason }, "Montant débité.")}>Débiter</button>
+                      </div>
                     </div>
                   </div>
                 ) : <p className="adm-empty" style={{ margin: 0 }}>Clique sur un marchand pour voir sa fiche et ses actions.</p>}
@@ -547,14 +582,39 @@ export default function AdminPage() {
         {step === "clients" && (
           <section>
             <h1>Clients</h1>
-            <p className="adm-sub">Tous les comptes inscrits, avec leur pays et leur statut de vérification.</p>
+            <p className="adm-sub">Tous les comptes inscrits, avec leur pays et leur statut de vérification. Touche une ligne pour voir la fiche.</p>
+            {selectedClient && (
+              <div className="adm-card" style={{ marginBottom: 16 }}>
+                <div className="adm-row" style={{ justifyContent: "space-between" }}>
+                  <h2 style={{ margin: 0 }}>{selectedClient.full_name || "Client sans nom"}</h2>
+                  <button className="adm-btn g" onClick={() => setSelectedClient(null)}>Fermer</button>
+                </div>
+                <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                  {[
+                    ["E-mail", selectedClient.email || "—"],
+                    ["Pays", selectedClient.country_code ?? "—"],
+                    ["Vérification", selectedClient.verification_status],
+                    ["Inscrit le", dateFmt(selectedClient.created_at)],
+                    ["Identifiant", selectedClient.id],
+                  ].map(([k, v]) => (
+                    <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 16, borderBottom: "1px solid #f1eff7", paddingBottom: 10, fontSize: 14 }}>
+                      <span style={{ color: "#8a8aa3" }}>{k}</span>
+                      <b style={{ color: "#14142b", textAlign: "right", overflowWrap: "anywhere" }}>{v}</b>
+                    </div>
+                  ))}
+                </div>
+                <div className="adm-row" style={{ marginTop: 14 }}>
+                  <button className="adm-btn" onClick={() => { setQuery(selectedClient.email); setStep("merchants"); setSelectedClient(null); }}>Voir son activité marchand</button>
+                </div>
+              </div>
+            )}
             <div className="adm-panel">
               <div className="adm-table-wrap">
                 <table className="adm-table">
                   <thead><tr><th>Nom</th><th>E-mail</th><th>Pays</th><th>Vérification</th><th>Inscrit le</th></tr></thead>
                   <tbody>
                     {(data?.clients ?? []).filter((c) => (c.email + c.full_name).toLowerCase().includes(query.trim().toLowerCase())).map((c) => (
-                      <tr key={c.id}>
+                      <tr key={c.id} onClick={() => setSelectedClient(c)} style={{ cursor: "pointer" }} aria-selected={selectedClient?.id === c.id}>
                         <td>{c.full_name || "—"}</td>
                         <td>{c.email || "—"}</td>
                         <td>{c.country_code ?? "—"}</td>
@@ -601,18 +661,80 @@ export default function AdminPage() {
         {step === "support" && (
           <section>
             <h1>Support</h1>
-            <p className="adm-sub">Demandes ouvertes des marchands. Ferme une demande une fois traitée.</p>
+            <p className="adm-sub">Demandes ouvertes des marchands. Réponds dans le fil, puis ferme la demande une fois traitée.</p>
             {(data?.tickets ?? []).length === 0 && <p className="adm-empty">Aucune demande ouverte.</p>}
-            {(data?.tickets ?? []).map((t) => (
-              <div className="adm-card" key={t.id}>
-                <h2>{t.subject}</h2>
-                <span className="adm-meta">{t.email || t.owner_id.slice(0, 8)} · {dateFmt(t.created_at)}</span>
-                <p style={{ margin: 0, color: "#4a4a63", fontSize: 14, lineHeight: 1.5 }}>{t.message}</p>
-                <div className="adm-row">
-                  <button className="adm-btn" disabled={busy} onClick={() => act({ action: "close_ticket", id: t.id }, "Demande fermée.")}>Marquer traitée</button>
+            {(data?.tickets ?? []).map((t) => {
+              const thread: TicketMessage[] = t.messages?.length
+                ? t.messages
+                : [{ id: t.id, ticket_id: t.id, author: "merchant", body: t.message, created_at: t.created_at }];
+              const last = thread[thread.length - 1];
+              const awaitingTeam = last.author === "merchant";
+              return (
+                <div className="adm-card" key={t.id}>
+                  <div className="adm-row" style={{ justifyContent: "space-between" }}>
+                    <h2 style={{ margin: 0 }}>{t.subject}</h2>
+                    <span className="adm-meta" style={{ fontWeight: 700, color: awaitingTeam ? "#c8321a" : "#0f7a47" }}>
+                      {awaitingTeam ? "À répondre" : "Réponse envoyée"}
+                    </span>
+                  </div>
+                  <span className="adm-meta">{t.email || t.owner_id.slice(0, 8)} · {dateFmt(t.created_at)}</span>
+
+                  <div style={{ display: "grid", gap: 8, margin: "12px 0" }}>
+                    {thread.map((m) => (
+                      <div
+                        key={m.id}
+                        style={{
+                          justifySelf: m.author === "admin" ? "end" : "start",
+                          maxWidth: "82%",
+                          background: m.author === "admin" ? "#5b3fd6" : "#f4f2fb",
+                          color: m.author === "admin" ? "#fff" : "#2a2940",
+                          borderRadius: 16,
+                          padding: "10px 14px",
+                          fontSize: 14,
+                          lineHeight: 1.5,
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        <div>{m.body}</div>
+                        <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>{m.author === "admin" ? "FlashPay" : "Marchand"} · {dateFmt(m.created_at)}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                    {QUICK_REPLIES.map((q) => (
+                      <button key={q} type="button" className="adm-btn g" style={{ fontSize: 12, padding: "6px 10px" }} onClick={() => setReplies((r) => ({ ...r, [t.id]: q }))}>
+                        {q.length > 34 ? q.slice(0, 34) + "…" : q}
+                      </button>
+                    ))}
+                  </div>
+
+                  <textarea
+                    value={replies[t.id] ?? ""}
+                    onChange={(e) => setReplies((r) => ({ ...r, [t.id]: e.target.value }))}
+                    placeholder="Écris ta réponse au marchand…"
+                    rows={3}
+                    maxLength={2000}
+                    style={{ width: "100%", boxSizing: "border-box", borderRadius: 14, border: "1px solid #e4e1ef", padding: 12, font: "inherit", resize: "vertical" }}
+                  />
+
+                  <div className="adm-row">
+                    <button
+                      className="adm-btn"
+                      disabled={busy || !(replies[t.id] ?? "").trim()}
+                      onClick={async () => {
+                        const text = (replies[t.id] ?? "").trim();
+                        await act({ action: "reply_ticket", id: t.id, body: text }, "Réponse envoyée au marchand.");
+                        setReplies((r) => ({ ...r, [t.id]: "" }));
+                      }}
+                    >
+                      {busy ? "Envoi en cours…" : "Envoyer la réponse"}
+                    </button>
+                    <button className="adm-btn g" disabled={busy} onClick={() => act({ action: "close_ticket", id: t.id }, "Demande fermée.")}>Marquer traitée</button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </section>
         )}
       </div>
