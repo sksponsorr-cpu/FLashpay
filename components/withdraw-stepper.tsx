@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import CountryPicker from "@/components/country-picker";
+import { callingCodeFor } from "@/lib/calling-codes";
 
 type Dest = {
   country_code: string;
@@ -132,7 +133,7 @@ export default function WithdrawStepper({
     padding: "14px",
     borderRadius: 14,
     border: 0,
-    background: "linear-gradient(145deg,#7b5cf0,#5b3fd6)",
+    background: "linear-gradient(145deg,#f0593f,#e8472a)",
     color: "#fff",
     fontWeight: 800,
     cursor: "pointer",
@@ -143,7 +144,7 @@ export default function WithdrawStepper({
     borderRadius: 14,
     border: "1px solid #ebe8f7",
     background: "#fff",
-    color: "#5b3fd6",
+    color: "#e8472a",
     fontWeight: 700,
     cursor: "pointer",
   };
@@ -162,7 +163,7 @@ export default function WithdrawStepper({
           style={{
             height: "100%",
             width: `${((step + 1) / STEPS.length) * 100}%`,
-            background: "linear-gradient(90deg,#7b5cf0,#5b3fd6)",
+            background: "linear-gradient(90deg,#f0593f,#e8472a)",
             transition: "width .45s",
           }}
         />
@@ -197,6 +198,12 @@ export default function WithdrawStepper({
           />
 
           <label>Numéro de réception</label>
+
+          <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8a8aa3" }}>
+            {dest.country_code
+              ? `Saisis le numéro sans l’indicatif. Ex. : 812345678 (préfixe ${callingCodeFor(dest.country_code) || "du pays"} ajouté automatiquement).`
+              : "Choisis d’abord le pays pour voir le format attendu."}
+          </p>
 
           <input
             placeholder="Numéro Mobile Money"

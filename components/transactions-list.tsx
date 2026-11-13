@@ -98,17 +98,28 @@ export default function TransactionsList({ appId }: { appId: string }) {
   const currencies = useMemo(() => Array.from(new Set((rows ?? []).map((r) => r.currency_code))).sort(), [rows]);
 
   function exportCsv() {
-    const header = ["reference", "type", "montant", "devise", "net", "statut", "date"];
+    // CSV compatible Excel français : BOM UTF-8, séparateur « ; », montants avec virgule décimale, champs échappés.
+    const esc = (v: unknown) => {
+      const t = v === null || v === undefined ? "" : String(v);
+      return /[";\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+    };
+    const num = (n: number | null | undefined) =>
+      n === null || n === undefined ? "" : Number(n).toFixed(2).replace(".", ",");
+    const day = (v: string) =>
+      new Date(v).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const header = ["Référence", "Type", "Montant", "Devise", "Net perçu", "Statut", "Date"];
     const lines = visible.map((r) => [
       r.transaction_id,
       r.purpose === "subscription" ? "Abonnement" : "Encaissement",
-      r.amount, r.currency_code, r.net_payable, statusLabel[r.status] ?? r.status, r.created_at,
-    ].join(";"));
-    const blob = new Blob([[header.join(";"), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+      num(r.amount), r.currency_code, num(r.net_payable),
+      statusLabel[r.status] ?? r.status, day(r.created_at),
+    ].map(esc).join(";"));
+    const csv = "\uFEFF" + [header.join(";"), ...lines].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "transactions.csv";
+    a.download = `flashpay-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -133,7 +144,7 @@ export default function TransactionsList({ appId }: { appId: string }) {
         </select>
         <label style={{ ...field, display: "flex", gap: 8, alignItems: "center" }}>Du <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ border: 0, background: "transparent", font: "inherit" }} /></label>
         <label style={{ ...field, display: "flex", gap: 8, alignItems: "center" }}>Au <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ border: 0, background: "transparent", font: "inherit" }} /></label>
-        <button type="button" onClick={exportCsv} disabled={!visible.length} style={{ ...field, background: "#5b3fd6", color: "#fff", border: 0, fontWeight: 700, cursor: visible.length ? "pointer" : "not-allowed", opacity: visible.length ? 1 : .5 }}>
+        <button type="button" onClick={exportCsv} disabled={!visible.length} style={{ ...field, background: "#e8472a", color: "#fff", border: 0, fontWeight: 700, cursor: visible.length ? "pointer" : "not-allowed", opacity: visible.length ? 1 : .5 }}>
           Exporter
         </button>
       </div>

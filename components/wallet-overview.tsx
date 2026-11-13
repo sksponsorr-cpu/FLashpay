@@ -259,7 +259,7 @@ export default function WalletOverview({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            action: "schedule",
+            action: "schedule", app_id: appId,
             currency_code: open.currency,
             amount: Number(amount),
             destination: {
@@ -333,7 +333,7 @@ export default function WalletOverview({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        action: "schedule",
+        action: "schedule", app_id: appId,
         currency_code: currency,
         amount,
         destination: dest,
@@ -385,6 +385,20 @@ export default function WalletOverview({
           .filter((c) => c !== open.currency)
           .sort()
       : [];
+
+  // Aperçu de conversion : frais réels de l'abonnement et taux indicatif (le taux final est fixé à l'envoi).
+  const convAmount = Number(amount) || 0;
+  const convRate =
+    open && open.mode === "convert" && toCurrency
+      ? data.rates.find(
+          (r) =>
+            r.from_currency === open.currency &&
+            r.to_currency === toCurrency
+        )?.rate ?? null
+      : null;
+  const convFeeAmount = convAmount * (data.fee.conversion / 100);
+  const convNet = convAmount - convFeeAmount;
+  const convEstimate = convRate !== null ? convNet * convRate : null;
 
   const operatorOptions = country
     ? DESTINATIONS[country]?.operators ?? []
@@ -603,6 +617,34 @@ export default function WalletOverview({
                     required
                   />
                 </label>
+
+                <div className="fp-card" style={{ padding: "14px 16px", margin: "4px 0 12px" }}>
+                  <div className="fp-row">
+                    <span className="fp-small">Frais de conversion ({data.fee.conversion} %)</span>
+                    <strong>
+                      {convAmount > 0 ? `${fmt(convFeeAmount)} ${open.currency}` : "—"}
+                    </strong>
+                  </div>
+                  <div className="fp-row">
+                    <span className="fp-small">Montant converti après frais</span>
+                    <strong>
+                      {convAmount > 0 ? `${fmt(convNet)} ${open.currency}` : "—"}
+                    </strong>
+                  </div>
+                  <div className="fp-row">
+                    <span className="fp-small">Reçu estimé</span>
+                    <strong>
+                      {convEstimate !== null
+                        ? `≈ ${fmt(convEstimate)} ${toCurrency}`
+                        : toCurrency
+                        ? "Taux indisponible"
+                        : "Choisis une devise"}
+                    </strong>
+                  </div>
+                  <p className="fp-small" style={{ margin: "8px 0 0" }}>
+                    Le montant exact est confirmé au traitement par l’équipe FlashPay.
+                  </p>
+                </div>
 
                 <div className="fp-actions">
                   <button
