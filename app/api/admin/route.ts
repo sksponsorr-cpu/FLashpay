@@ -1,6 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { sendPushToOwner } from "@/lib/push";
 
 // Espace administrateur FlashPay. Chaque action passe par une fonction SQL qui vérifie is_admin.
 // La lecture de toutes les demandes utilise la clé service role, uniquement après vérification admin.
@@ -221,9 +222,15 @@ export async function POST(request: Request) {
     case "reply_ticket": {
       const text = (body.body ?? "").trim();
       if (!text || text.length > 2000) return NextResponse.json({ message: "Message invalide." }, { status: 400 });
-      const { data: ticket } = await serviceClient().from("support_tickets").select("owner_id,status").eq("id", body.id).maybeSingle();
+      const { data: ticket } = await serviceClient().from("support_tickets").select("owner_id,status,subject").eq("id", body.id).maybeSingle();
       if (!ticket || ticket.status !== "open") return NextResponse.json({ message: "Demande fermée ou introuvable." }, { status: 400 });
       result = await serviceClient().from("support_messages").insert({ ticket_id: body.id, owner_id: ticket.owner_id, author: "admin", body: text });
+      if (!result.error) {
+        const title = "Réponse du support";
+        const note = `Nouvelle réponse sur ta demande : ${ticket.subject ?? "support"}.`;
+        await serviceClient().from("user_notifications").insert({ owner_id: ticket.owner_id, kind: "info", title, body: note, reference: body.id }).then(() => null, () => null);
+        await sendPushToOwner(ticket.owner_id, { title, body: note, url: "/support" }).catch(() => {});
+      }
       break;
     }
     case "close_ticket":
