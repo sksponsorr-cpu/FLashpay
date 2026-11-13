@@ -12,9 +12,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   const { data: link } = await admin.from("payment_links").select("app_id").eq("token", token).maybeSingle();
   if (!link?.app_id) return NextResponse.json({ brand: null }, { headers: { "Cache-Control": "no-store" } });
 
-  const { data: app } = await admin.from("apps").select("name, brand_logo_url, brand_color, brand_template, brand_animation, brand_logo_position").eq("id", link.app_id).maybeSingle();
+  const { data: app } = await admin.from("apps").select("name, brand_logo_url, brand_cover_url, brand_color, brand_template, brand_animation, brand_logo_position").eq("id", link.app_id).maybeSingle();
   return NextResponse.json(
-    { brand: app ? { name: app.name, logo_url: app.brand_logo_url, color: app.brand_color, template: app.brand_template, animation: app.brand_animation, logo_position: app.brand_logo_position } : null },
+    { brand: app ? { name: app.name, logo_url: app.brand_logo_url, cover_url: app.brand_cover_url, color: app.brand_color, template: app.brand_template, animation: app.brand_animation, logo_position: app.brand_logo_position } : null },
     { headers: { "Cache-Control": "no-store" } }
   );
 }
