@@ -1,5 +1,5 @@
 // Envoi des notifications push à tous les appareils d'un utilisateur.
-// Nécessite : npm install web-push  et les variables VAPID_PRIVATE_KEY, NEXT_PUBLIC_VAPID_PUBLIC_KEY.
+// Nécessite le paquet web-push (ajouté dans package.json) et les variables VAPID dans Vercel.
 import webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
