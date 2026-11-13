@@ -4,8 +4,8 @@ import Link from "next/link";
 import PaymentProviderSwitch from "@/components/admin/payment-provider-switch";
 import BrandLoader from "@/components/brand-loader";
 
-type Withdrawal = { id: string; currency_code: string; requested_amount: number; payout_amount: number; fee_amount: number; destination_details?: unknown; destination_name?: string | null; destination_country?: string | null; destination_operator?: string | null; destination_mobile?: string | null; created_at: string };
-type Conversion = { id: string; from_currency: string; to_currency: string; amount: number; fee_rate?: number; created_at: string };
+type Withdrawal = { id: string; currency_code: string; requested_amount: number; payout_amount: number; fee_amount: number; destination_details?: unknown; destination_name?: string | null; destination_country?: string | null; destination_operator?: string | null; destination_mobile?: string | null; status: string; last_error?: string | null; created_at: string };
+type Conversion = { id: string; from_currency: string; to_currency: string; amount: number; fee_rate?: number; status: string; created_at: string };
 type Rate = { from_currency: string; to_currency: string; rate: number };
 type Minimum = { currency_code: string; minimum_amount: number };
 type Account = { id: string; email: string };
