@@ -90,6 +90,7 @@ const messages: Record<string, string> = {
   MINIMUM_NOT_CONFIGURED: "Le retrait n’est pas encore disponible dans cette devise.",
   INVALID_AMOUNT: "Le montant doit être supérieur à zéro.",
   INVALID_CONVERSION: "Choisis deux devises différentes et un montant valide.",
+  APP_NOT_FOUND: "Application introuvable.",
   NOT_AUTHENTICATED: "Connecte-toi.",
 };
 
@@ -119,8 +120,11 @@ export async function POST(request: Request) {
       p_amount: body.amount,
     });
   } else if (body.action === "convert") {
-    // Conversion : la fonction SQL applique les frais de conversion (4,5 %, 1 % en Premium).
-    result = await supabase.rpc("request_conversion", {
+    // Conversion : scopée à l'application (le portefeuille est par application).
+    // Frais : 4,5 % (1 % en Premium), appliqués par la fonction SQL.
+    if (!body.app_id) return NextResponse.json({ message: "Application introuvable." }, { status: 400 });
+    result = await supabase.rpc("request_conversion_for_app", {
+      p_app_id: body.app_id,
       p_from: body.from_currency,
       p_to: body.to_currency,
       p_amount: body.amount,
