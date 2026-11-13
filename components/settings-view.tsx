@@ -17,6 +17,7 @@ const verifLabel: Record<string, string> = {
 };
 
 import AvatarUpload from "@/components/avatar-upload";
+import PushSubscribe from "@/components/push-subscribe";
 
 export default function SettingsView({ appId, initialTab = "app" }: { appId: string; initialTab?: "app" | "verif" | "security" }) {
   const [tab, setTab] = useState<"app" | "verif" | "security" | "team">(initialTab);
@@ -78,6 +79,12 @@ export default function SettingsView({ appId, initialTab = "app" }: { appId: str
   return (
     <section className="set-wrap">
       <AvatarUpload />
+
+      <section className="dash-card set-card" style={{ display: "grid", gap: 8 }}>
+        <strong>Notifications sur ton téléphone</strong>
+        <span className="dash-muted" style={{ fontSize: 13 }}>Reçois une alerte pour les paiements, les retraits, les réponses du support et les annonces.</span>
+        <PushSubscribe />
+      </section>
 
       <div className="dev-tabs" role="tablist">
         <button role="tab" aria-selected={tab === "app"} className={tab === "app" ? "dev-tab on" : "dev-tab"} onClick={() => setTab("app")}>Application</button>
