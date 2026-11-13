@@ -2,7 +2,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { clientFeeFor, ISO_BY_COUNTRY_NAME, networksFor } from "@/lib/client-fees";
 import { FLASHPAY_MARGIN_POINTS } from "@/lib/fee-schedule";
-import BrandLoader from "@/components/brand-loader";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -147,7 +146,7 @@ function PayContent() {
     }
   }
 
-  const [brand, setBrand] = useState<{ name: string; logo_url: string | null; color: string | null; template?: string; animation?: string; logo_position?: string } | null>(null);
+  const [brand, setBrand] = useState<{ name: string; logo_url: string | null; cover_url?: string | null; color: string | null; template?: string; animation?: string; logo_position?: string } | null>(null);
   // Statistiques de conversion : une visite par chargement de la page (sans donnée personnelle).
   useEffect(() => {
     fetch(`/api/pay/${encodeURIComponent(token)}/view`, { method: "POST", keepalive: true }).catch(() => {});
@@ -327,13 +326,37 @@ function PayContent() {
       <style>{css}</style>
       <div className="pg-card">
         <div className="pg-top">
-          <div className="pg-brand">{brand?.logo_url ? <img src={brand.logo_url} alt={brand.name} style={{ height: 40, maxWidth: 160, objectFit: "contain" }} /> : <><span className="pg-logo">f</span><span>flash<span style={{ color: "#e8472a" }}>pay</span></span></>}</div>
+          <div className="pg-brand">{brand?.logo_url ? <img src={brand.logo_url} alt={brand.name} style={{ height: 40, maxWidth: 160, objectFit: "contain" }} /> : brand?.name ? <span>{brand.name}</span> : null}</div>
           {brand?.color && <style>{`.pg-btn:not(.pg-ghost){background:${brand.color} !important}` + checkoutCss(brand)}</style>}
           {link?.mode === "test" && <span className="pg-test">Mode test</span>}
         </div>
 
+        {brand?.cover_url && (brand.template === "oreo" || brand.template === "feed" || brand.template === "make") && (
+          brand.template === "oreo" ? (
+            <div style={{ margin: "14px -4px 0", borderRadius: 18, overflow: "hidden", background: "#f4f2fb" }}>
+              <img src={brand.cover_url} alt="" style={{ display: "block", width: "100%", height: 190, objectFit: "cover" }} />
+            </div>
+          ) : brand.template === "make" ? (
+            <div style={{ margin: "14px -20px 0", padding: "16px 20px", background: "#14142b", color: "#fff", display: "flex", gap: 12, alignItems: "center", borderRadius: "18px 18px 0 0" }}>
+              <img src={brand.cover_url} alt="" style={{ width: 64, height: 64, borderRadius: 12, objectFit: "cover", flex: "none" }} />
+              <div style={{ minWidth: 0 }}>
+                <strong style={{ display: "block", fontSize: 15, overflow: "hidden", textOverflow: "ellipsis" }}>{link?.label ?? brand.name}</strong>
+                <span style={{ fontSize: 12, opacity: 0.7 }}>{brand.name}</span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginTop: 14, display: "flex", gap: 12, alignItems: "center" }}>
+              <img src={brand.cover_url} alt="" style={{ width: 76, height: 76, borderRadius: 16, objectFit: "cover", flex: "none" }} />
+              <div style={{ minWidth: 0 }}>
+                <strong style={{ display: "block", fontSize: 15 }}>{link?.label ?? ""}</strong>
+                <span style={{ fontSize: 12, color: "#8a8aa3" }}>{brand.name}</span>
+              </div>
+            </div>
+          )
+        )}
+
         {notFound && <p className="pg-sub" style={{ marginTop: 18 }}>Ce lien de paiement n’existe pas.</p>}
-        {!notFound && !link && <div style={{ marginTop: 18 }}><BrandLoader /></div>}
+        {!notFound && !link && <div role="status" aria-label="Chargement en cours" style={{ marginTop: 18, display: "grid", placeItems: "center", height: 80 }}><span style={{ width: 36, height: 36, borderRadius: "50%", border: "3px solid #f1eef8", borderTopColor: brand?.color ?? "#e8472a", animation: "pgSpin 0.9s linear infinite" }} /><style>{"@keyframes pgSpin{to{transform:rotate(360deg)}}"}</style></div>}
 
         {link && (
           <>
@@ -424,11 +447,12 @@ function PayContent() {
 
 // Modèle, animation et position du logo choisis par le marchand (valeurs contrôlées, jamais du texte libre).
 function checkoutCss(b: { template?: string; animation?: string; logo_position?: string }) {
-  const tpl = b.template === "split" || b.template === "minimal" ? b.template : "classic";
+  const tpl = b.template === "split" || b.template === "minimal" || b.template === "glass" ? b.template : "classic";
   const anim = b.animation === "none" || b.animation === "rise" ? b.animation : "fade";
   const parts: string[] = [];
   if (tpl === "split") parts.push(".pg-card{border-top:8px solid var(--brand,#e8472a)}");
   if (tpl === "minimal") parts.push(".pg-card{box-shadow:none;border:1px solid #ebe8f7}");
+  if (tpl === "glass") parts.push(".pg{background:linear-gradient(160deg,var(--brand,#e8472a) 0%,#14142b 100%)!important}.pg-card{background:rgba(255,255,255,.78)!important;backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);border:1px solid rgba(255,255,255,.6);box-shadow:0 30px 70px -30px rgba(0,0,0,.45)}");
   if (b.logo_position === "center") parts.push(".pg-brand{justify-content:center}");
   if (anim === "none") parts.push(".pg-card{animation:none!important}");
   if (anim === "fade") parts.push("@keyframes pgFadeIn{from{opacity:0}to{opacity:1}}.pg-card{animation:pgFadeIn .5s ease both!important}");
