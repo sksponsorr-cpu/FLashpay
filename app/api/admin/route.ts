@@ -37,7 +37,7 @@ export async function GET() {
   });
 
   const [withdrawals, conversions, rates, minimums] = await Promise.all([
-    admin.from("withdrawal_requests").select("*").eq("status", "pending").order("created_at", { ascending: true }),
+    admin.from("withdrawal_requests").select("*").in("status", ["pending", "scheduled", "sending", "processing", "failed"]).order("created_at", { ascending: true }),
     admin.from("conversion_requests").select("*").eq("status", "pending").order("created_at", { ascending: true }),
     admin.from("fx_rates").select("*").order("from_currency"),
     admin.from("withdrawal_minimums").select("*").order("currency_code"),
@@ -105,7 +105,17 @@ export async function GET() {
   const clients = (profilesRes.data ?? []).map((p) => ({ ...p, email: emailOf.get(p.id) ?? "" }));
   const interwallet = (movementsRes.data ?? []).map((m) => ({ ...m, email: emailOf.get(m.owner_id) ?? "" }));
   const references = (txRefsRes.data ?? []).map((t) => ({ ...t, email: emailOf.get(t.owner_id) ?? "" }));
-  const tickets = (ticketsRes.data ?? []).map((t) => ({ ...t, email: emailOf.get(t.owner_id) ?? "" }));
+  const ticketRows = ticketsRes.data ?? [];
+  const threadRes = ticketRows.length
+    ? await admin.from("support_messages").select("id,ticket_id,author,body,created_at").in("ticket_id", ticketRows.map((t) => t.id)).order("created_at", { ascending: true })
+    : { data: [] as { id: string; ticket_id: string; author: string; body: string; created_at: string }[] };
+  const threadsByTicket = new Map<string, unknown[]>();
+  for (const m of threadRes.data ?? []) {
+    const list = threadsByTicket.get(m.ticket_id) ?? [];
+    list.push(m);
+    threadsByTicket.set(m.ticket_id, list);
+  }
+  const tickets = ticketRows.map((t) => ({ ...t, email: emailOf.get(t.owner_id) ?? "", messages: threadsByTicket.get(t.id) ?? [] }));
 
   // Bénéfice plateforme par devise : frais d'encaissement + frais de retrait + marge de conversion.
   const profit: Record<string, number> = {};
@@ -138,8 +148,10 @@ export async function GET() {
 type AdminAction =
   | { action: "set_account_status"; owner_id: string; status: "active" | "suspended" | "banned"; days?: number }
   | { action: "credit_wallet"; owner_id: string; currency: string; amount: number; reason: string }
+  | { action: "debit_wallet"; owner_id: string; currency: string; amount: number; reason: string }
   | { action: "set_margin"; points: number }
   | { action: "close_ticket"; id: string }
+  | { action: "reply_ticket"; id: string; body: string }
   | { action: "mark_withdrawal_paid"; id: string }
   | { action: "reject_withdrawal"; id: string }
   | { action: "complete_conversion"; id: string; rate: number }
@@ -170,24 +182,48 @@ export async function POST(request: Request) {
       }).eq("id", body.owner_id);
       break;
     }
-    case "credit_wallet": {
+    case "credit_wallet":
+    case "debit_wallet": {
       const amount = Number(body.amount);
       if (!(amount > 0) || !body.reason?.trim()) return NextResponse.json({ message: "Montant et motif obligatoires." }, { status: 400 });
       const svc = serviceClient();
-      const { data: wallet } = await svc.from("wallets").select("id, balance").eq("owner_id", body.owner_id).eq("currency_code", body.currency).maybeSingle();
-      if (!wallet) return NextResponse.json({ message: "Aucun portefeuille dans cette devise pour ce compte." }, { status: 404 });
-      const newBalance = Number(wallet.balance) + amount;
-      await svc.from("wallets").update({ balance: newBalance, updated_at: new Date().toISOString() }).eq("id", wallet.id);
-      result = await svc.from("wallet_movements").insert({
-        owner_id: body.owner_id, wallet_id: wallet.id, currency_code: body.currency, kind: "adjustment",
-        amount, balance_after: newBalance, reference: `admin_credit:${crypto.randomUUID()}`,
+      // Le portefeuille est par application : on prend celui qui a le plus de solde pour un débit,
+      // le plus ancien pour un crédit. Le nom de l'application est renvoyé dans le message.
+      const { data: wallets } = await svc
+        .from("wallets")
+        .select("id, balance, app_id, apps(name)")
+        .eq("owner_id", body.owner_id)
+        .eq("currency_code", body.currency)
+        .order("created_at", { ascending: true });
+      const list = (wallets ?? []) as unknown as { id: string; balance: number; app_id: string | null; apps: { name: string } | null }[];
+      if (list.length === 0) return NextResponse.json({ message: "Aucun portefeuille dans cette devise pour ce compte." }, { status: 404 });
+      const wallet = body.action === "debit_wallet"
+        ? [...list].sort((x, y) => Number(y.balance) - Number(x.balance))[0]
+        : list[0];
+      const delta = body.action === "debit_wallet" ? -amount : amount;
+      const newBalance = Number(wallet.balance) + delta;
+      if (newBalance < 0) return NextResponse.json({ message: "Solde insuffisant pour ce débit." }, { status: 400 });
+      const { error: upErr } = await svc.from("wallets").update({ balance: newBalance, updated_at: new Date().toISOString() }).eq("id", wallet.id);
+      if (upErr) return NextResponse.json({ message: "Mise à jour du solde impossible." }, { status: 500 });
+      const { error: mvErr } = await svc.from("wallet_movements").insert({
+        owner_id: body.owner_id, app_id: wallet.app_id, wallet_id: wallet.id, currency_code: body.currency, kind: "adjustment",
+        amount: delta, balance_after: newBalance, reference: `admin_${body.action === "debit_wallet" ? "debit" : "credit"}:${crypto.randomUUID()}`,
       });
-      break;
+      if (mvErr) return NextResponse.json({ message: "Mouvement non enregistré." }, { status: 500 });
+      return NextResponse.json({ ok: true, application: wallet.apps?.name ?? null });
     }
     case "set_margin": {
       const points = Number(body.points);
       if (!Number.isFinite(points) || points < 0 || points > 50) return NextResponse.json({ message: "Marge invalide (0 à 50 points)." }, { status: 400 });
       result = await serviceClient().from("platform_settings").upsert({ key: "client_fee_margin_points", value: points, updated_at: new Date().toISOString() });
+      break;
+    }
+    case "reply_ticket": {
+      const text = (body.body ?? "").trim();
+      if (!text || text.length > 2000) return NextResponse.json({ message: "Message invalide." }, { status: 400 });
+      const { data: ticket } = await serviceClient().from("support_tickets").select("owner_id,status").eq("id", body.id).maybeSingle();
+      if (!ticket || ticket.status !== "open") return NextResponse.json({ message: "Demande fermée ou introuvable." }, { status: 400 });
+      result = await serviceClient().from("support_messages").insert({ ticket_id: body.id, owner_id: ticket.owner_id, author: "admin", body: text });
       break;
     }
     case "close_ticket":
