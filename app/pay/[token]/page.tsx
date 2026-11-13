@@ -49,7 +49,7 @@ const dialByCurrency: Record<string, { code: string; label: string }> = {
 // Frais ajoutés au montant, à la charge du client (ajoutés côté serveur).
 
 
-const extraCss = `.pg-ring{position:relative;width:110px;height:110px;border-radius:50%;background:#f1edff;display:grid;place-items:center;animation:pgPulse 1.8s ease-in-out infinite}.pg-phone{font-size:42px}.pg-steps{display:flex;gap:10px;align-items:center;font-size:14px;color:#55566a}.pg-stepn{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#f1edff;color:#5b3fd6;font-weight:800}@keyframes pgPulse{0%,100%{box-shadow:0 0 0 0 rgba(91,63,214,.25)}50%{box-shadow:0 0 0 22px rgba(91,63,214,0)}}`;
+const extraCss = `.pg-ring{position:relative;width:110px;height:110px;border-radius:50%;background:#f1edff;display:grid;place-items:center;animation:pgPulse 1.8s ease-in-out infinite}.pg-phone{font-size:42px}.pg-steps{display:flex;gap:10px;align-items:center;font-size:14px;color:#55566a}.pg-stepn{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#f1edff;color:#e8472a;font-weight:800}@keyframes pgPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,71,42,.25)}50%{box-shadow:0 0 0 22px rgba(232,71,42,0)}}`;
 
 const fmt = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n);
 
@@ -61,41 +61,41 @@ html,body{background:#f4f2ff}
 .pg-card{position:relative;width:100%;max-width:440px;background:#fff;border-radius:28px;padding:22px 20px 26px;box-shadow:0 30px 70px -30px rgba(40,30,110,.45);overflow:hidden;animation:pgUp .5s cubic-bezier(.2,.8,.2,1) both}
 .pg-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .pg-brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
-.pg-logo{display:grid;place-items:center;width:38px;height:38px;border-radius:13px;background:linear-gradient(145deg,#7b5cf0,#5b3fd6);color:#fff}
+.pg-logo{display:grid;place-items:center;width:38px;height:38px;border-radius:13px;background:linear-gradient(145deg,#f0593f,#e8472a);color:#fff}
 .pg-test{font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:#fff4e0;color:#8a5a00}
 .pg-amount{margin:16px 0 4px;font-size:34px;font-weight:800;letter-spacing:-.02em}
 .pg-amount small{font-size:16px;color:#6b6c80}
 .pg-sub{color:#6b6c80;font-size:14px;margin:0 0 16px}
 .pg-dots{display:flex;gap:6px;margin:6px 0 18px}
 .pg-dot{flex:1;height:6px;border-radius:6px;background:#ebe8f7;transition:background .4s ease}
-.pg-dot.on{background:linear-gradient(90deg,#7b5cf0,#5b3fd6)}
+.pg-dot.on{background:linear-gradient(90deg,#f0593f,#e8472a)}
 .pg-step{animation:pgSlide .4s cubic-bezier(.2,.8,.2,1) both}
 .pg-h{font-size:21px;font-weight:800;margin:0 0 4px}
 .pg-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .pg-tile{position:relative;display:grid;gap:6px;justify-items:start;padding:14px;border-radius:18px;border:1px solid #ebe8f7;background:#fff;cursor:pointer;text-align:left;transition:transform .2s ease,box-shadow .25s ease,border-color .25s ease}
 .pg-tile:active{transform:scale(.97)}
-.pg-tile.on{border-color:#5b3fd6;background:#f8f6ff;box-shadow:0 12px 26px -12px rgba(91,63,214,.5)}
+.pg-tile.on{border-color:#e8472a;background:#f8f6ff;box-shadow:0 12px 26px -12px rgba(232,71,42,.5)}
 .pg-chip{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:12px}
 .pg-tile strong{font-size:14px}
 .pg-fee{font-size:12px;color:#6b6c80}
-.pg-tick{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:#5b3fd6;color:#fff;display:grid;place-items:center;font-size:12px;transform:scale(0);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.pg-tick{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:#e8472a;color:#fff;display:grid;place-items:center;font-size:12px;transform:scale(0);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
 .pg-tile.on .pg-tick{transform:scale(1)}
 .pg-field{position:relative;margin-top:14px}
 .pg-field input{width:100%;min-height:58px;padding:24px 14px 8px;border:1px solid #ebe8f7;border-radius:16px;background:#fbfaff;font:inherit;transition:border-color .25s ease,box-shadow .25s ease}
-.pg-field input:focus{outline:none;border-color:#5b3fd6;box-shadow:0 0 0 4px rgba(91,63,214,.15)}
+.pg-field input:focus{outline:none;border-color:#e8472a;box-shadow:0 0 0 4px rgba(232,71,42,.15)}
 .pg-field label{position:absolute;left:14px;top:20px;color:#6b6c80;font-size:15px;pointer-events:none;transition:all .25s ease}
-.pg-field input:focus + label,.pg-field input:not(:placeholder-shown) + label{top:8px;font-size:11px;color:#5b3fd6;font-weight:700}
+.pg-field input:focus + label,.pg-field input:not(:placeholder-shown) + label{top:8px;font-size:11px;color:#e8472a;font-weight:700}
 .pg-prefix{display:flex;align-items:center;gap:8px;margin-top:14px;padding:0 14px;min-height:58px;border:1px solid #ebe8f7;border-radius:16px;background:#fbfaff}
 .pg-rule{margin-top:12px;padding:12px 14px;border-radius:14px;background:#f4f1ff;font-size:13px;color:#3d3560}.pg-rule ul{margin:6px 0 0;padding-left:18px}.pg-rule li{margin:2px 0}
 .pg-prefix input{flex:1;border:0;background:transparent;font:inherit;font-size:16px;padding:14px 0;outline:none}
 .pg-recap{display:grid;gap:0;border-radius:18px;background:#fbfaff;padding:6px 14px;margin:6px 0 16px}
 .pg-recap div{display:flex;justify-content:space-between;gap:10px;padding:12px 0;border-top:1px solid #ebe8f7;font-size:14px}
 .pg-recap div:first-child{border-top:0}
-.pg-total{font-size:19px;font-weight:800;color:#5b3fd6}
-.pg-btn{width:100%;min-height:56px;border:0;border-radius:18px;background:linear-gradient(145deg,#7b5cf0,#5b3fd6);color:#fff;font:inherit;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 16px 30px -12px rgba(91,63,214,.7);transition:transform .15s ease}
+.pg-total{font-size:19px;font-weight:800;color:#e8472a}
+.pg-btn{width:100%;min-height:56px;border:0;border-radius:18px;background:linear-gradient(145deg,#f0593f,#e8472a);color:#fff;font:inherit;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 16px 30px -12px rgba(232,71,42,.7);transition:transform .15s ease}
 .pg-btn:active{transform:scale(.98)}
 .pg-btn:disabled{opacity:.55}
-.pg-ghost{background:#fff;color:#5b3fd6;border:1px solid #ebe8f7;box-shadow:none;margin-top:10px}
+.pg-ghost{background:#fff;color:#e8472a;border:1px solid #ebe8f7;box-shadow:none;margin-top:10px}
 .pg-msg{margin:12px 0 0;font-size:14px;font-weight:600;color:#c8321a}
 .pg-foot{margin-top:18px;text-align:center;font-size:12px;color:#8a8aa3}
 @keyframes pgUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
@@ -124,7 +124,30 @@ function PayContent() {
   const [txId, setTxId] = useState("");
   const [waitStatus, setWaitStatus] = useState<"" | "pending" | "successful" | "failed">("");
   const [secondsLeft, setSecondsLeft] = useState(30);
-  const [brand, setBrand] = useState<{ name: string; logo_url: string | null; color: string | null } | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  // Relance du même paiement SasPay (même transaction FlashPay) avec le réseau déjà choisi.
+  async function retrySamePayment() {
+    if (!txId || !network) return;
+    setRetrying(true);
+    setMsg("");
+    try {
+      const r = await fetch(`/api/pay/${encodeURIComponent(token)}/retry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transaction_id: txId, operator: network }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.message ?? "Relance impossible.");
+      setWaitStatus("pending");
+      setSecondsLeft(PAY_WINDOW_SECONDS);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Relance impossible.");
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  const [brand, setBrand] = useState<{ name: string; logo_url: string | null; color: string | null; template?: string; animation?: string; logo_position?: string } | null>(null);
   // Statistiques de conversion : une visite par chargement de la page (sans donnée personnelle).
   useEffect(() => {
     fetch(`/api/pay/${encodeURIComponent(token)}/view`, { method: "POST", keepalive: true }).catch(() => {});
@@ -152,19 +175,13 @@ function PayContent() {
     fetch(`/api/pay/${encodeURIComponent(token)}/status?tx=${encodeURIComponent(txId)}`, { cache: "no-store" }).catch(() => {});
   }, [waitStatus, txId, token]);
 
-  // Paiement direct : 30 secondes pour valider sur le téléphone, sinon le paiement n'aboutit pas.
+  // Paiement direct : 3 minutes pour valider sur le téléphone. Le compte à rebours est indicatif :
+  // à zéro, on continue de vérifier auprès du fournisseur au lieu d'annoncer un échec.
   useEffect(() => {
     if (!txId) return;
-    setSecondsLeft(30);
+    setSecondsLeft(PAY_WINDOW_SECONDS);
     const clock = setInterval(() => {
-      setSecondsLeft((v) => {
-        if (v <= 1) {
-          clearInterval(clock);
-          setWaitStatus((w) => (w === "successful" ? w : "failed"));
-          return 0;
-        }
-        return v - 1;
-      });
+      setSecondsLeft((v) => (v <= 1 ? 0 : v - 1));
     }, 1000);
     return () => clearInterval(clock);
   }, [txId]);
@@ -183,7 +200,8 @@ function PayContent() {
       } catch {
         // on réessaie au prochain tour
       }
-      if (tries > 60) { setWaitStatus("failed"); clearInterval(timer); }
+      // Environ 3 minutes de vérification après la fenêtre de validation, puis échec définitif.
+      if (tries > PAY_MAX_POLLS) { setWaitStatus("failed"); clearInterval(timer); }
     }, 3000);
     return () => clearInterval(timer);
   }, [txId, token, waitStatus]);
@@ -193,7 +211,7 @@ function PayContent() {
     ? networksFor(link.country_name, link.currency_code).map((n) => ({
         name: n.network,
         short: n.network.split(" ").map((w) => w[0]).join("").slice(0, 3).toUpperCase(),
-        color: "#5b3fd6",
+        color: "#e8472a",
       }))
     : [];
   // Frais du réseau choisi = taux de la grille tarification (minimum appliqué si connu).
@@ -285,8 +303,9 @@ function PayContent() {
           ) : waitStatus === "failed" ? (
             <>
               <h2 className="pg-h">Le paiement n’a pas abouti</h2>
-              <p className="pg-sub">Le paiement n’a pas été confirmé dans le temps imparti (30 secondes). Tu peux réessayer.</p>
-              <button className="pg-btn" onClick={() => { setTxId(""); setWaitStatus(""); setStep(2); }}>Réessayer</button>
+              <p className="pg-sub">Le paiement n’a pas été confirmé dans le temps imparti. Si l’argent a été débité, contacte le support avec ta référence.</p>
+              <button className="pg-btn" disabled={retrying} onClick={() => void retrySamePayment()}>{retrying ? "Relance en cours…" : "Relancer sur ce téléphone"}</button>
+              <button className="pg-btn pg-ghost" style={{ marginTop: 10 }} onClick={() => { setTxId(""); setWaitStatus(""); setStep(2); }}>Choisir un autre réseau</button>
             </>
           ) : (
             <>
@@ -308,8 +327,8 @@ function PayContent() {
       <style>{css}</style>
       <div className="pg-card">
         <div className="pg-top">
-          <div className="pg-brand">{brand?.logo_url ? <img src={brand.logo_url} alt={brand.name} style={{ height: 40, maxWidth: 160, objectFit: "contain" }} /> : <><span className="pg-logo">f</span><span>flash<span style={{ color: "#5b3fd6" }}>pay</span></span></>}</div>
-          {brand?.color && <style>{`.pg-btn:not(.pg-ghost){background:${brand.color} !important}`}</style>}
+          <div className="pg-brand">{brand?.logo_url ? <img src={brand.logo_url} alt={brand.name} style={{ height: 40, maxWidth: 160, objectFit: "contain" }} /> : <><span className="pg-logo">f</span><span>flash<span style={{ color: "#e8472a" }}>pay</span></span></>}</div>
+          {brand?.color && <style>{`.pg-btn:not(.pg-ghost){background:${brand.color} !important}` + checkoutCss(brand)}</style>}
           {link?.mode === "test" && <span className="pg-test">Mode test</span>}
         </div>
 
@@ -328,7 +347,7 @@ function PayContent() {
                 <h2 className="pg-h">Ton pays</h2>
                 <p className="pg-sub">Ce paiement est demandé pour {link.country_name}.</p>
                 <div className="pg-tile on" style={{ cursor: "default" }}>
-                  <span className="pg-chip" style={{ background: "#5b3fd6" }}>{link.currency_code}</span>
+                  <span className="pg-chip" style={{ background: "#e8472a" }}>{link.currency_code}</span>
                   <strong>{link.country_name}</strong>
                   <span className="pg-tick">✓</span>
                 </div>
@@ -402,6 +421,24 @@ function PayContent() {
     </main>
   );
 }
+
+// Modèle, animation et position du logo choisis par le marchand (valeurs contrôlées, jamais du texte libre).
+function checkoutCss(b: { template?: string; animation?: string; logo_position?: string }) {
+  const tpl = b.template === "split" || b.template === "minimal" ? b.template : "classic";
+  const anim = b.animation === "none" || b.animation === "rise" ? b.animation : "fade";
+  const parts: string[] = [];
+  if (tpl === "split") parts.push(".pg-card{border-top:8px solid var(--brand,#e8472a)}");
+  if (tpl === "minimal") parts.push(".pg-card{box-shadow:none;border:1px solid #ebe8f7}");
+  if (b.logo_position === "center") parts.push(".pg-brand{justify-content:center}");
+  if (anim === "none") parts.push(".pg-card{animation:none!important}");
+  if (anim === "fade") parts.push("@keyframes pgFadeIn{from{opacity:0}to{opacity:1}}.pg-card{animation:pgFadeIn .5s ease both!important}");
+  if (anim === "rise") parts.push("@keyframes pgRiseIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}.pg-card{animation:pgRiseIn .6s cubic-bezier(.2,.8,.2,1) both!important}");
+  parts.push("@media(prefers-reduced-motion:reduce){.pg-card{animation:none!important}}");
+  return parts.join("");
+}
+
+const PAY_WINDOW_SECONDS = 180;
+const PAY_MAX_POLLS = 150; // 3 s par tentative : environ 7,5 minutes au maximum
 
 export default function PayPage() {
   return (
