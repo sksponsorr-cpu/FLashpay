@@ -96,6 +96,7 @@ const CSS = `
 .adm-in{min-height:40px;width:100%;padding:0 12px;border:0;border-radius:10px;background:rgba(118,118,128,.10);font:inherit;font-size:14px;color:var(--ink);outline:0;transition:box-shadow .2s ease,background .2s ease}
 .adm-in:focus{background:#fff;box-shadow:0 0 0 3px rgba(232,71,42,.25)}
 .adm-lbl{font-size:13px;font-weight:500;color:var(--ink2)}
+.adm-note.err{background:rgba(255,59,48,.10);color:#c7281d}
 .adm-note{margin-bottom:16px;padding:12px 16px;border-radius:12px;background:rgba(52,199,89,.12);color:#1d6b33;font-size:14px;font-weight:500;animation:adm-rise .3s ease both}
 .adm-empty{color:var(--ink3);font-size:14px}
 .adm-err{margin-bottom:14px;padding:12px 16px;border-radius:12px;background:rgba(255,59,48,.10);color:#c7281d;font-weight:500}
@@ -138,6 +139,30 @@ function Simulator() {
   );
 }
 
+
+// Messages lisibles pour les codes renvoyés par la base ou les services.
+const ERROR_MESSAGES: Record<string, string> = {
+  INVALID_RATE: "Indique un taux valide (supérieur à zéro) avant de terminer la conversion.",
+  NOT_ADMIN: "Accès réservé à l’administrateur.",
+  INSUFFICIENT_BALANCE: "Solde insuffisant pour cette opération.",
+  NOT_PAYABLE: "Ce retrait ne peut plus être marqué payé.",
+  NOT_REJECTABLE: "Ce retrait ne peut plus être rejeté.",
+  UNKNOWN_REQUEST: "Demande introuvable.",
+  ALREADY_PROCESSED: "Cette demande a déjà été traitée.",
+};
+
+// Taux suggéré à partir de la grille chargée (fx_rates) : direct, ou inverse si seule la paire inverse existe.
+function suggestedRate(rates: { from_currency: string; to_currency: string; rate: number }[] | undefined, from: string, to: string): string {
+  const direct = rates?.find((r) => r.from_currency === from && r.to_currency === to);
+  if (direct) return String(direct.rate);
+  return "";
+}
+
+function friendlyError(message: string): string {
+  const key = Object.keys(ERROR_MESSAGES).find((k) => message.includes(k));
+  return key ? ERROR_MESSAGES[key] : message || "Action refusée.";
+}
+
 export default function AdminPage() {
   const [step, setStep] = useState<Step>("overview");
   const [navOpen, setNavOpen] = useState(false);
@@ -146,6 +171,7 @@ export default function AdminPage() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeError, setNoticeError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [bellOpen, setBellOpen] = useState(false);
@@ -172,7 +198,7 @@ export default function AdminPage() {
   useEffect(() => { void load(); }, []);
 
   async function act(body: Record<string, unknown>, ok: string) {
-    setBusy(true); setNotice("");
+    setBusy(true); setNotice(""); setNoticeError(false);
     try {
       const response = await fetch("/api/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const result = await response.json();
@@ -180,7 +206,8 @@ export default function AdminPage() {
       setNotice(ok);
       await load();
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Action refusée.");
+      setNoticeError(true);
+      setNotice(friendlyError(e instanceof Error ? e.message : ""));
     } finally {
       setBusy(false);
     }
@@ -261,7 +288,7 @@ export default function AdminPage() {
         </header>
 
         {error && <p className="adm-err">{error}</p>}
-        {notice && <div className="adm-note" role="status">{notice}</div>}
+        {notice && <div className={`adm-note${noticeError ? " err" : ""}`} role={noticeError ? "alert" : "status"}>{notice}</div>}
 
         {step === "overview" && (
           <section>
@@ -349,7 +376,7 @@ export default function AdminPage() {
               <div className="adm-card" key={c.id}>
                 <h2>{fmt(c.amount)} {c.from_currency} → {c.to_currency}</h2>
                 <span className="adm-meta">{dateFmt(c.created_at)}</span>
-                <input className="adm-in" inputMode="decimal" placeholder="Taux appliqué" value={convRate[c.id] ?? ""} onChange={(e) => setConvRate({ ...convRate, [c.id]: e.target.value })} />
+                <input className="adm-in" inputMode="decimal" placeholder="Taux appliqué" value={convRate[c.id] ?? suggestedRate(data?.rates, c.from_currency, c.to_currency)} onChange={(e) => setConvRate({ ...convRate, [c.id]: e.target.value })} />
                 {(() => {
                   const rate = Number(convRate[c.id]);
                   const fee = Number(c.fee_rate ?? 0);
@@ -365,7 +392,7 @@ export default function AdminPage() {
                   );
                 })()}
                 <div className="adm-row">
-                  <button className="adm-btn" disabled={busy} onClick={() => act({ action: "complete_conversion", id: c.id, rate: Number(convRate[c.id]) }, "Conversion terminée.")}>Terminer</button>
+                  <button className="adm-btn" disabled={busy || !(Number(convRate[c.id] ?? suggestedRate(data?.rates, c.from_currency, c.to_currency)) > 0)} onClick={() => act({ action: "complete_conversion", id: c.id, rate: Number(convRate[c.id] ?? suggestedRate(data?.rates, c.from_currency, c.to_currency)) }, "Conversion terminée.")}>Terminer</button>
                 </div>
               </div>
             ))}
