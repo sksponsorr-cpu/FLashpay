@@ -1,13 +1,17 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-// Menu de compte en haut à droite (comme SasPay) : nom, e-mail, Paramètres, Support, Déconnexion.
+// Menu de compte en haut à droite : nom, e-mail, Paramètres, Support, Déconnexion.
+// Un seul panneau à la fois : ouvrir ce menu ferme les notifications, et inversement.
+export const POPOVER_EVENT = "fp:popover";
+
 export default function AccountMenu({ onSettings }: { onSettings: () => void }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -30,6 +34,38 @@ export default function AccountMenu({ onSettings }: { onSettings: () => void }) 
     return () => window.removeEventListener("fp:avatar", onAvatar);
   }, []);
 
+  // Un autre panneau s'ouvre -> on ferme celui-ci.
+  useEffect(() => {
+    const onOther = (e: Event) => { if ((e as CustomEvent<string>).detail !== "account") setOpen(false); };
+    window.addEventListener(POPOVER_EVENT, onOther);
+    return () => window.removeEventListener(POPOVER_EVENT, onOther);
+  }, []);
+
+  // Clic extérieur ou touche Échap : fermeture.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  function toggle() {
+    setOpen((v) => {
+      const next = !v;
+      if (next) window.dispatchEvent(new CustomEvent(POPOVER_EVENT, { detail: "account" }));
+      return next;
+    });
+  }
+
   async function signOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -39,15 +75,19 @@ export default function AccountMenu({ onSettings }: { onSettings: () => void }) 
   const initials = (name || "?").slice(0, 2).toUpperCase();
 
   return (
-    <div className="am-wrap">
-      <button className="am-btn" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        <span className="am-avatar">{avatar ? <img src={avatar} alt="" width={32} height={32} style={{ borderRadius: "50%", objectFit: "cover" }} /> : initials}</span>
+    <div className="am-wrap" ref={wrapRef}>
+      <button className="am-btn" onClick={toggle} aria-expanded={open} aria-label="Menu du compte">
+        <span className="am-avatar" style={avatarBox(32)}>
+          {avatar ? <img src={avatar} alt="" style={imgFill} /> : initials}
+        </span>
         <span className="am-chev">{open ? "▴" : "▾"}</span>
       </button>
       {open && (
         <div className="am-pop" role="menu">
           <div className="am-head">
-            <span className="am-avatar lg">{initials}</span>
+            <span className="am-avatar lg" style={avatarBox(44)}>
+              {avatar ? <img src={avatar} alt="" style={imgFill} /> : initials}
+            </span>
             <span className="am-id"><strong>{name}</strong><small>{email}</small></span>
           </div>
           <button className="am-item" onClick={() => { setOpen(false); onSettings(); }}>Paramètres</button>
@@ -58,3 +98,9 @@ export default function AccountMenu({ onSettings }: { onSettings: () => void }) 
     </div>
   );
 }
+
+// Force la photo dans un cercle propre, sans débordement.
+function avatarBox(size: number) {
+  return { width: size, height: size, minWidth: size, borderRadius: "50%", overflow: "hidden", display: "grid", placeItems: "center", flexShrink: 0 } as const;
+}
+const imgFill = { width: "100%", height: "100%", objectFit: "cover", display: "block" } as const;
