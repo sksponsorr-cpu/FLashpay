@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 type Dispute = { id: string; transaction_id: string; reason: string; status: string; created_at: string };
 const statusLabel: Record<string, string> = { open: "Ouvert", in_review: "En cours", resolved: "Résolu" };
 
+// Litiges de CETTE application uniquement : on ne montre que les litiges portant sur ses transactions.
 export default function DisputesView({ appId }: { appId: string }) {
   const [rows, setRows] = useState<Dispute[] | null>(null);
   const [txIds, setTxIds] = useState<string[]>([]);
@@ -19,13 +20,15 @@ export default function DisputesView({ appId }: { appId: string }) {
     let cancelled = false;
     (async () => {
       const supabase = createClient();
-      const [d, t] = await Promise.all([
-        supabase.from("disputes").select("id,transaction_id,reason,status,created_at").order("created_at", { ascending: false }).limit(100),
-        supabase.from("transactions").select("transaction_id").eq("app_id", appId).eq("environment", "live").order("created_at", { ascending: false }).limit(200),
-      ]);
+      // Toutes les transactions de l'application (test et live) pour rattacher les litiges.
+      const { data: t } = await supabase.from("transactions").select("transaction_id").eq("app_id", appId).order("created_at", { ascending: false }).limit(500);
+      const ids = (t ?? []).map((x: { transaction_id: string }) => x.transaction_id);
+      const { data: d } = ids.length
+        ? await supabase.from("disputes").select("id,transaction_id,reason,status,created_at").in("transaction_id", ids).order("created_at", { ascending: false }).limit(100)
+        : { data: [] as Dispute[] };
       if (cancelled) return;
-      setRows((d.data ?? []) as Dispute[]);
-      setTxIds((t.data ?? []).map((x: { transaction_id: string }) => x.transaction_id));
+      setTxIds(ids.filter((_, i) => i < 200));
+      setRows((d ?? []) as Dispute[]);
     })();
     return () => { cancelled = true; };
   }, [appId, reload]);
@@ -38,8 +41,9 @@ export default function DisputesView({ appId }: { appId: string }) {
       return;
     }
     setBusy(true);
-    const { data: { user } } = await createClient().auth.getUser();
-    const { error } = await createClient().from("disputes").insert({ owner_id: user?.id, transaction_id: txId, reason: reason.trim() });
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("disputes").insert({ owner_id: user?.id, transaction_id: txId, reason: reason.trim() });
     setBusy(false);
     if (error) {
       setNotice("Litige refusé : vérifie la transaction choisie.");
