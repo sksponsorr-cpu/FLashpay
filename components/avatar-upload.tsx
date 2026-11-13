@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function AvatarUpload({ current }: { current?: string | null }) {
   const [url, setUrl] = useState<string | null>(current ?? null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -20,29 +21,39 @@ export default function AvatarUpload({ current }: { current?: string | null }) {
   }, []);
 
   async function onPick(file: File) {
+    setError("");
+    if (!file.type.startsWith("image/")) { setError("Choisis une image (JPG, PNG ou WebP)."); return; }
+    if (file.size > 5 * 1024 * 1024) { setError("Image trop lourde (5 Mo maximum)."); return; }
     setBusy(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setBusy(false); return; }
-    const path = `${user.id}/avatar.${file.name.split(".").pop() ?? "png"}`;
-    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-    if (!error) {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setError("Connecte-toi pour changer ta photo."); return; }
+      const ext = (file.name.split(".").pop() ?? "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+      const path = `${user.id}/avatar.${ext}`;
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) { setError("Envoi impossible. Réessaie dans un instant."); return; }
       const { data } = supabase.storage.from("avatars").getPublicUrl(path);
       const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
-      await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
+      const { error: dbErr } = await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
+      if (dbErr) { setError("Photo envoyée, mais l’enregistrement a échoué. Réessaie."); return; }
       setUrl(publicUrl);
       window.dispatchEvent(new CustomEvent("fp:avatar", { detail: publicUrl }));
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   return (
     <label style={{ display: "inline-flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
-      <span style={{ width: 64, height: 64, borderRadius: "50%", overflow: "hidden", background: "#f1edff", display: "grid", placeItems: "center" }}>
-        {url ? <img src={url} alt="Photo de profil" width={64} height={64} style={{ objectFit: "cover" }} /> : <span style={{ color: "#5b3fd6", fontWeight: 800 }}>+</span>}
+      <span style={{ width: 64, height: 64, borderRadius: "50%", overflow: "hidden", background: "#fdeae5", display: "grid", placeItems: "center" }}>
+        {url ? <img src={url} alt="Photo de profil" width={64} height={64} style={{ objectFit: "cover" }} /> : <span style={{ color: "#e8472a", fontWeight: 800 }}>+</span>}
       </span>
-      <span style={{ fontSize: 14, color: "#55566a" }}>{busy ? "Envoi…" : "Changer la photo"}</span>
-      <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && void onPick(e.target.files[0])} />
+      <span style={{ display: "grid", gap: 4 }}>
+        <span style={{ fontSize: 14, color: "#55566a" }}>{busy ? "Envoi en cours…" : "Changer la photo"}</span>
+        {error && <span role="alert" style={{ fontSize: 12, color: "#c8321a", fontWeight: 600 }}>{error}</span>}
+      </span>
+      <input type="file" accept="image/*" hidden disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void onPick(f); }} />
     </label>
   );
 }
