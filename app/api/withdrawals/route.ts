@@ -7,6 +7,7 @@ import { runDuePayouts } from "@/lib/payout-runner";
 
 type Body = {
   action: "schedule";
+  app_id?: string;
   currency_code: string;
   amount: number;
   destination: {
@@ -32,6 +33,8 @@ const messages: Record<string, string> = {
 
   INVALID_AMOUNT:
     "Le montant doit être supérieur à zéro.",
+
+  APP_NOT_FOUND: "Application introuvable.",
 
   INVALID_DESTINATION:
     "Indique l’opérateur et le numéro qui recevront l’argent.",
@@ -80,6 +83,7 @@ export async function POST(request: Request) {
       p_operator: d?.operator ?? "",
       p_mobile: (d?.mobile ?? "").replace(/\D/g, ""),
       p_name: d?.name ?? "",
+      p_app_id: body.app_id ?? null,
     }
   );
 
